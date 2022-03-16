@@ -30,7 +30,7 @@ create_mail_file () {
 }
 
 check_db_errors () {
-    if [[ $(tail -${prod_log_lines} "${prod_log}" | grep "Return code:1200" | wc -l) -gt ${error_threshold} ]]; then
+    if [[ $(tail -${prod_log_lines} "${prod_log}" | grep -c "Return code:1200") -gt ${error_threshold} ]]; then
         echo -e "prod.log file showing return code 1200 message; potential DB update issue, check log to investigate\n" >> "${mail_file}"
         error_threshold_exceeded="true"
     fi
