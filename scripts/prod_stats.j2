@@ -40,10 +40,9 @@ create_unload_file () {
 }
 
 unload_db_rows () {
-    dbaccess ${database} - 2>/dev/null <<EOF
-
+    dbaccess ${database} <<EOF >/dev/null 2>&1
 set isolation dirty read;
-unload to ${unload_file} delimiter ","
+unload to "${unload_file}" delimiter ","
 select prod_info.description, product.location, count(*), price
 from product, prod_info
 where product.system_id = "CIC"
