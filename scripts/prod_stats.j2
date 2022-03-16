@@ -51,14 +51,13 @@ and product.tx_date between "${start_date}" and "${end_date}"
 and (product.prod_code = prod_info.prod_code)
 group by prod_info.description, product.location, prod_info.price
 order by prod_info.description, product.location, prod_info.price;
-
 EOF
 }
 
 populate_mail_file () {
-    echo -e "PROD stats for period ${start_date} to ${end_date}\n" >> ${mail_file}
-    echo -e "Product Type,Location,Total,Value per Transaction\n"  >> ${mail_file}
-    cat ${unload_file} >> ${mail_file}
+    echo -e "PROD stats for period ${start_date} to ${end_date}\n" >> "${mail_file}"
+    echo -e "Product Type,Location,Total,Value per Transaction\n"  >> "${mail_file}"
+    cat "${unload_file}" >> "${mail_file}"
 }
 
 delete_unload_file () {
@@ -69,12 +68,11 @@ delete_mail_file () {
     rm -f "${mail_file}"
 }
 
-# -- Alerting -----------------------------------------------------------------
+# -- Stats --------------------------------------------------------------------
 
 send_stats () {
 {% if stats.enabled %}
-    # TODO install sharutils package for access to uuencode
-    uuencode ${mail_file} prod_stats.csv | mailx -s "PROD stats for period ${start_date} to ${end_date}" {% for recipient in stats_config.prod_stats %}{{ recipient }} {% endfor %}
+    uuencode "${mail_file}" prod_stats.csv | mailx -s "PROD stats for period ${start_date} to ${end_date}" {% for recipient in stats_config.prod_stats %}{{ recipient }} {% endfor %}
 {% else %}
     echo "Stats disabled; no file(s) will be sent"
 {% endif %}
