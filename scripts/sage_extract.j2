@@ -73,16 +73,16 @@ send_extracts () {
     local remote_host="$1"
     local remote_dir="$2"
 
-    {% if stats.enabled %}
+{% if stats.enabled %}
     ftp -v ${remote_host} <<EOF
 cd ${remote_dir}
 put ${extracts_file} ${telesales_filename}
 put ${extracts_file} backup_${telesales_filename}
 bye
 EOF
-    {% else %}
-        echo "Stats disabled; no file(s) will be sent"
-    {% endif %}
+{% else %}
+    echo "Stats disabled; no file(s) will be sent"
+{% endif %}
 }
 
 # -- Entrypoint ---------------------------------------------------------------
@@ -92,9 +92,9 @@ main () {
     create_unload_file
     create_extracts_file
     unload_db_rows
-    {% for remote in stats_config.sage_extract_remotes %}
+{% for remote in stats_config.sage_extract_remotes %}
     send_stats {{ remote.host }} {{ remote.dir }}
-    {% endfor %}
+{% endfor %}
     delete_extracts_file
     delete_unload_file
 }
