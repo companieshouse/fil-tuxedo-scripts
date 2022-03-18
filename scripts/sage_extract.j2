@@ -1,0 +1,102 @@
+#!/bin/bash
+
+# Generate and transfer telesales data files to finance system.
+
+source {{ informix_install_path }}/etc/informix.env.${USER}
+
+# -- Internal variables -------------------------------------------------------
+
+script_name=$(basename "$0")
+
+telesales_filename="telesales_int.txt"
+database="prod"
+
+# -- General ------------------------------------------------------------------
+
+check_user () {
+    if [[ "${USER}" == "root" ]]; then
+        echo "${script_name}: This script should be executed as a Tuxedo service user not root"
+        exit 1
+    fi
+}
+
+create_unload_file () {
+    unload_file=$(mktemp -t unload_file.XXXXXXX)
+    if [[ $? -ne 0 ]]; then
+        echo "Unable to create temporary unload file" >&2
+        exit 1
+    fi
+}
+
+create_extracts_file () {
+    extracts_file=$(mktemp -t extracts_file.XXXXXXX)
+    if [[ $? -ne 0 ]]; then
+        echo "Unable to create temporary extracts file" >&2
+        exit 1
+    fi
+
+    while read -r line; do
+        if [[ -n "${line}" ]]; then
+            echo "${line}" | sed "s/,/ /g" | awk -F "|" '{printf("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%d,%s,%s \n",
+                $1, $2, $11, $12, $4, $5, $6, $7, $8, $9, $10, $13, $14, $19, $3, $21, $18, $17, $20, $15, $16)}' >> "${extracts_file}"
+        fi
+    done < "${unload_file}"
+}
+
+unload_db_rows () {
+    dbaccess ${database} <<EOF >/dev/null 2>&1
+unload to "${unload_file}" delimiter "|"
+select product.inv_session_no,invoice.account_no,
+product.comp_no,invoice.ref,invoice.search_name,invoice.search_addr_1,
+invoice.search_addr_2,invoice.search_addr_3,invoice.search_addr_4,
+invoice.search_postcode,invoice.date,invoice.time,invoice.payment_type,
+invoice.cheque_no,invoice.tel_no,
+invoice.fax_no,product.doc_type,product.doc_date,product.prod_code,
+product.quantity,product.comp_name
+from product,invoice where product.tx_date ="TODAY"
+and product.inv_session_no = invoice.inv_no
+and product.system_id = "CEU"
+EOF
+}
+
+delete_unload_file () {
+    rm -f "${unload_file}"
+}
+
+delete_extracts_file () {
+    rm -f "${extracts_file}"
+}
+
+# -- Stats --------------------------------------------------------------------
+
+send_extracts () {
+    local remote_host="$1"
+    local remote_dir="$2"
+
+{% if stats.enabled %}
+    ftp -v ${remote_host} <<EOF
+cd ${remote_dir}
+put ${extracts_file} ${telesales_filename}
+put ${extracts_file} backup_${telesales_filename}
+bye
+EOF
+{% else %}
+    echo "Stats disabled; no file(s) will be sent"
+{% endif %}
+}
+
+# -- Entrypoint ---------------------------------------------------------------
+
+main () {
+    check_user
+    create_unload_file
+    create_extracts_file
+    unload_db_rows
+{% for remote in stats_config.sage_extract_remotes %}
+    send_stats {{ remote.host }} {{ remote.dir }}
+{% endfor %}
+    delete_extracts_file
+    delete_unload_file
+}
+
+main "${@}"

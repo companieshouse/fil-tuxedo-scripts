@@ -1,0 +1,66 @@
+#!/bin/bash
+
+# Check prod service logs for errors indicating database update failures.
+
+# -- Internal variables -------------------------------------------------------
+
+script_name=$(basename "$0")
+
+prod_log="{{ tuxedo_logs_path }}/${USER}/prod.log"
+prod_log_lines="25"
+
+error_threshold="0"
+error_threshold_exceeded="false"
+
+# -- General ------------------------------------------------------------------
+
+check_user () {
+    if [[ "${USER}" == "root" ]]; then
+        echo "${script_name}: This script should be executed as a Tuxedo service user not root"
+        exit 1
+    fi
+}
+
+create_mail_file () {
+    mail_file=$(mktemp -t check_db_errors.XXXXXXX)
+    if [[ $? -ne 0 ]]; then
+        echo "Unable to create temporary mail file" >&2
+        exit 1
+    fi
+}
+
+check_db_errors () {
+    if [[ $(tail -${prod_log_lines} "${prod_log}" | grep -c "Return code:1200") -gt ${error_threshold} ]]; then
+        echo -e "prod.log file showing return code 1200 message; potential DB update issue, check log to investigate\n" >> "${mail_file}"
+        error_threshold_exceeded="true"
+    fi
+}
+
+# -- Alerts -------------------------------------------------------------------
+
+send_alert () {
+{% if alerts.enabled %}
+    mailx -r "${USER}@$(hostname)" -s "Return code 1200 message in prod.log; potential DB update issue - INVESTIGATE - $(date)" {% for recipient in alerts_config.db_error_check %}{{ recipient }} {% endfor %}< "${mail_file}"
+{% else %}
+    echo "Alerts disabled; no mail message(s) will be generated"
+{% endif %}
+}
+
+delete_mail_file () {
+    rm -f "${mail_file}"
+}
+
+# -- Entrypoint ---------------------------------------------------------------
+
+main () {
+    check_user
+    check_db_errors
+
+    if [[ "${error_threshold_exceeded}" == "true" ]]; then
+        send_alert
+    fi
+
+    delete_mail_file
+}
+
+main "${@}"
