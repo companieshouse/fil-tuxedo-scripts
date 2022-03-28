@@ -71,7 +71,15 @@ delete_mail_file () {
 
 send_stats () {
 {% if stats.enabled %}
-    uuencode "${mail_file}" prod_stats.csv | mailx -s "PROD stats for period ${start_date} to ${end_date}" {% for recipient in stats_config.prod_stats %}{{ recipient }} {% endfor %}
+    local temp_dir=$(mktemp -d -t prod_stats.XXXXXXX)
+    if [[ $? -ne 0 ]]; then
+        echo "Unable to create temporary mail directory" >&2
+        exit 1
+    fi
+
+    cp "${mail_file}" "${temp_dir}/prod_stats.csv"
+    mailx -a "${temp_dir}/prod_stats.csv" -s "PROD stats for period ${start_date} to ${end_date}" {% for recipient in stats_config.recipients %}{{ recipient }} {% endfor %}< /dev/null
+    rm -rf "${temp_dir}"
 {% else %}
     echo "Stats disabled; no file(s) will be sent"
 {% endif %}

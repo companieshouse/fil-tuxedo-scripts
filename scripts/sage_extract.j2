@@ -29,11 +29,7 @@ create_unload_file () {
 }
 
 create_extracts_file () {
-    extracts_file=$(mktemp -t extracts_file.XXXXXXX)
-    if [[ $? -ne 0 ]]; then
-        echo "Unable to create temporary extracts file" >&2
-        exit 1
-    fi
+    extracts_file="{{ tuxedo_logs_path }}/${USER}/sage_extract.$(date +%Y%m%d).log"
 
     while read -r line; do
         if [[ -n "${line}" ]]; then
@@ -63,23 +59,18 @@ delete_unload_file () {
     rm -f "${unload_file}"
 }
 
-delete_extracts_file () {
-    rm -f "${extracts_file}"
-}
-
 # -- Stats --------------------------------------------------------------------
 
-send_extracts () {
-    local remote_host="$1"
-    local remote_dir="$2"
-
+send_stats () {
 {% if stats.enabled %}
-    ftp -v ${remote_host} <<EOF
-cd ${remote_dir}
+{% for remote in stats_config.ftp_hosts %}
+    ftp -v {{ remote.host }} <<EOF > {{ tuxedo_logs_path }}/${USER}/sage_extract.ftp.log 2>&1
+cd {{ remote.directory }}
 put ${extracts_file} ${telesales_filename}
 put ${extracts_file} backup_${telesales_filename}
 bye
 EOF
+{% endfor %}
 {% else %}
     echo "Stats disabled; no file(s) will be sent"
 {% endif %}
@@ -90,12 +81,9 @@ EOF
 main () {
     check_user
     create_unload_file
-    create_extracts_file
     unload_db_rows
-{% for remote in stats_config.sage_extract_remotes %}
-    send_stats {{ remote.host }} {{ remote.dir }}
-{% endfor %}
-    delete_extracts_file
+    create_extracts_file
+    send_stats
     delete_unload_file
 }
 

@@ -53,6 +53,7 @@ delete_mail_file () {
 # -- Entrypoint ---------------------------------------------------------------
 
 main () {
+    create_mail_file
     check_user
     check_db_errors
 
