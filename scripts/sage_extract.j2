@@ -29,7 +29,7 @@ create_unload_file () {
 }
 
 create_extracts_file () {
-    extracts_file="{{ tuxedo_logs_path }}/${USER}/sage_extract.$(date +%Y%m%d).log"
+    extracts_file="{{ tuxedo_logs_path }}/${USER}/sage_extract_data.$(date +%Y%m%d)"
 
     while read -r line; do
         if [[ -n "${line}" ]]; then
