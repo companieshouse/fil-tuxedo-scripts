@@ -36,6 +36,10 @@ check_db_errors () {
     fi
 }
 
+delete_mail_file () {
+    rm -f "${mail_file}"
+}
+
 # -- Alerts -------------------------------------------------------------------
 
 send_alert () {
@@ -44,10 +48,6 @@ send_alert () {
 {% else %}
     echo "Alerts disabled; no mail message(s) will be generated"
 {% endif %}
-}
-
-delete_mail_file () {
-    rm -f "${mail_file}"
 }
 
 # -- Entrypoint ---------------------------------------------------------------

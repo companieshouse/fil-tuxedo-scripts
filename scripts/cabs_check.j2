@@ -1,0 +1,101 @@
+#!/bin/bash
+
+# Check cabs service is running and check logs for network errors.
+
+# -- Internal variables -------------------------------------------------------
+
+script_name=$(basename "$0")
+
+today=$(date +%d%m%y)
+failures=()
+
+cabs_log="{{ tuxedo_logs_path }}/${USER}/cabs.log"
+cabs_ulog="{{ tuxedo_logs_path }}/${USER}/ULOG.$(date +%m%d%y)"
+
+cabs_min_count=1
+
+# -- General ------------------------------------------------------------------
+
+check_user () {
+    if [[ "${USER}" == "root" ]]; then
+        echo "${script_name}: This script should be executed as a Tuxedo service user not root"
+        exit 1
+    fi
+}
+
+create_mail_file () {
+    mail_file=$(mktemp -t cabs_check.XXXXXXX)
+    if [[ $? -ne 0 ]]; then
+        echo "Unable to create temporary mail file" >&2
+        exit 1
+    fi
+}
+
+check_network_errors () {
+    local network_errors=$(tail -20 "${cabs_ulog}" | grep "Service request not forwarded to remote site" | wc -l)
+
+    if [[ "${network_errors}" -gt 10 ]]; then
+        append_mail_file "ULOG showing service request not forwarded error, tux messaging will be failing and needs rebooting"
+        record_unit_fail "Service request not forwarded error"
+    fi
+}
+
+check_cabs_service () {
+    local cabs_count=$(ps -ef | grep "CABS" | grep "${cabs_log}" | grep -v "grep" | wc -l)
+
+    if [[ "${cabs_count}" -lt "${cabs_min_count}" ]]; then
+        append_mail_file "${today}, Tuxedo CABS Server is not running"
+        record_unit_fail "CABS"
+    fi
+}
+
+append_mail_file () {
+    local message="$1"
+    echo "${message}" >> "${mail_file}"
+}
+
+record_unit_fail () {
+    local unit="$1"
+
+    IFS=" "
+    if [[ ! "${IFS}${failures[*]}${IFS}" =~ "${IFS}${unit}${IFS}" ]]; then
+        failures+=("${unit}")
+    fi
+    unset IFS
+}
+
+delete_mail_file () {
+    rm -f "${mail_file}"
+}
+
+# -- Alerts -------------------------------------------------------------------
+
+send_alert () {
+    local subject="$1"
+    local mail_file="$2"
+{% if alerts.enabled %}
+    mailx -r "${USER}@$(hostname)" -s "WARNING - ${subject}" {% for recipient in alerts_config.cabs_check %}{{ recipient }} {% endfor %}< "${mail_file}"
+{% else %}
+    echo "Alerts disabled; no mail message(s) will be generated"
+{% endif %}
+}
+
+# -- Entrypoint ---------------------------------------------------------------
+
+main () {
+    create_mail_file
+
+    check_user
+    check_cabs_service
+    check_network_errors
+
+    if [[ -s "${mail_file}" ]]; then
+        readarray -t unit_failures < <(for f in "${failures[@]}"; do echo "$f"; done | sort | uniq)
+        append_mail_file ""
+        send_alert "CHARGING Problem - ${unit_failures[*]}" "${mail_file}"
+    fi
+
+    delete_mail_file
+}
+
+main "${@}"
