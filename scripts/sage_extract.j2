@@ -11,6 +11,8 @@ script_name=$(basename "$0")
 telesales_filename="telesales_int.txt"
 database="prod"
 
+reqdate=${1-TODAY}
+
 # -- General ------------------------------------------------------------------
 
 check_user () {
@@ -40,7 +42,7 @@ create_extracts_file () {
 }
 
 unload_db_rows () {
-    dbaccess ${database} <<EOF >/dev/null 2>&1
+    DBDATE=DMY4 dbaccess ${database} <<EOF >/dev/null 2>&1
 unload to "${unload_file}" delimiter "|"
 select product.inv_session_no,invoice.account_no,
 product.comp_no,invoice.ref,invoice.search_name,invoice.search_addr_1,
@@ -49,7 +51,7 @@ invoice.search_postcode,invoice.date,invoice.time,invoice.payment_type,
 invoice.cheque_no,invoice.tel_no,
 invoice.fax_no,product.doc_type,product.doc_date,product.prod_code,
 product.quantity,product.comp_name
-from product,invoice where product.tx_date ="TODAY"
+from product,invoice where product.tx_date ="${reqdate}"
 and product.inv_session_no = invoice.inv_no
 and product.system_id = "CEU"
 EOF
