@@ -1,0 +1,110 @@
+#!/bin/bash
+
+# Export pre-95 mortgage documents from Informix database to NFS shares.
+
+source "{{ informix_install_path }}/etc/informix.env.${USER}"
+
+# -- Internal variables -------------------------------------------------------
+
+script_name=$(basename "$0")
+
+database="scud"
+date_suffix=$(date +%d%m%Y)
+scan_dir=/data1/home/scanning
+
+# -- General ------------------------------------------------------------------
+
+check_user () {
+    if [[ "${USER}" == "root" ]]; then
+        echo "${script_name}: This script should be executed as a Tuxedo service user not root"
+        exit 1
+    fi
+}
+
+create_mail_file () {
+    mail_file=$(mktemp -t pre95m_mail.XXXXXXX)
+    if [[ $? -ne 0 ]]; then
+        echo "Unable to create temporary mail file" >&2
+        exit 1
+    fi
+}
+
+create_unload_file () {
+    unload_file=$(mktemp -t pre95m_unload_file.XXXXXXX)
+    if [[ $? -ne 0 ]]; then
+        echo "Unable to create temporary unload file" >&2
+        exit 1
+    fi
+}
+
+create_data_file () {
+    data_file=$(mktemp -t pre95m_data.XXXXXXX)
+    if [[ $? -ne 0 ]]; then
+        echo "Unable to create temporary data file" >&2
+        exit 1
+    fi
+
+    cut -c1-8 "${unload_file}" >> "${data_file}"
+}
+
+unload_db_rows () {
+    dbaccess "${database}" <<EOF >/dev/null 2>&1
+unload to "${unload_file}"
+select company_number from orders
+        where ( order_date_out = (today - 1) or order_date = (today - 1) )  and
+        order_status = "Z";
+EOF
+}
+
+copy_data_file () {
+    cp "${data_file}" "${scan_dir}/ftf/PRE95M"
+    cp "${data_file}" "${scan_dir}/trig1/oldfiles/PRE95M.${date_suffix}"
+}
+
+populate_mail_file () {
+    echo -e "No PRE95M file, please check ${scan_dir}/ftf\n" >> "${mail_file}"
+    cat "${data_file}" >> "${mail_file}"
+}
+
+delete_unload_file () {
+    rm -f "${unload_file}"
+}
+
+delete_mail_file () {
+    rm -f "${mail_file}"
+}
+
+delete_data_file () {
+    rm -f "${data_file}"
+}
+
+# -- Alerts -------------------------------------------------------------------
+
+send_alert () {
+# {% if alerts.enabled %}
+    mailx -r "${USER}@$(hostname)" -s "WARNING - PRE95M file missing" {% for recipient in alerts_config.db_error_check %}{{ recipient }} {% endfor %}< "${mail_file}"
+# {% else %}
+    echo "Alerts disabled; no mail message(s) will be generated"
+# {% endif %}
+}
+
+# -- Entrypoint ---------------------------------------------------------------
+
+main () {
+    check_user
+    create_mail_file
+    create_unload_file
+    unload_db_rows
+    create_data_file
+    populate_mail_file
+
+    if [[ ! -f ${scan_dir}/ftf/PRE95M ]]; then
+        send_alert
+    fi
+
+    delete_data_file
+    delete_unload_file
+    delete_mail_file
+}
+
+main "${@}"
