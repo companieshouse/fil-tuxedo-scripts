@@ -12,6 +12,13 @@ default_log_level="3"
 
 # -- General ------------------------------------------------------------------
 
+check_user () {
+    if [[ "${USER}" == "root" ]]; then
+        echo "${script_name}: This script should be executed as a Tuxedo service user not root"
+        exit 1
+    fi
+}
+
 check_daemon () {
     if [[ -n "$(pgrep -u ${USER} SMS_poll)" ]]; then
         echo "${script_name}: SMS poll daemon is already running" >&2
@@ -30,6 +37,7 @@ start_daemon () {
 # -- Entrypoint ---------------------------------------------------------------
 
 main () {
+    check_user
     check_daemon
     start_daemon "${@}"
 }
