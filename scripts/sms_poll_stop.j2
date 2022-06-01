@@ -1,0 +1,48 @@
+#!/bin/bash
+
+# Stop SMS poll daemon.
+
+# -- Internal variables -------------------------------------------------------
+
+script_name=$(basename "$0")
+
+max_pid_wait_seconds="10"
+
+# -- General ------------------------------------------------------------------
+
+check_daemon () {
+    if [[ -z "$(pgrep -u ${USER} SMS_poll)" ]]; then
+        echo "${script_name}: SMS poll daemon is not running" >&2
+        exit 1
+    fi
+}
+
+stop_daemon () {
+    local daemon_pid="$(pgrep -u ${USER} SMS_poll)"
+
+    echo "${script_name}: stopping SMS poll daemon"
+    kill -s SIGTERM "${daemon_pid}"
+
+    local pid_wait_attempts=0
+
+    while $(kill -0 "${daemon_pid}" 2>/dev/null); do
+        if [[ "${pid_wait_attempts}" -gt "${max_pid_wait_seconds}" ]]; then
+            echo "${script_name}: could not stop SMS poll daemon"
+            exit 1
+        else
+            ((pid_wait_attempts++))
+        fi
+        sleep 1
+    done
+
+    echo "${script_name}: SMS poll daemon stopped"
+}
+
+# -- Entrypoint ---------------------------------------------------------------
+
+main () {
+    check_daemon
+    stop_daemon
+}
+
+main "${@}"
