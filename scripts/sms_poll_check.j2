@@ -54,9 +54,8 @@ send_alert () {
 # -- Entrypoint ---------------------------------------------------------------
 
 main () {
-    create_mail_file
-
     check_user
+    create_mail_file
     check_daemon
 
     if [[ -s "${mail_file}" ]]; then
