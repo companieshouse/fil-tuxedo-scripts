@@ -1,0 +1,86 @@
+#!/bin/bash
+
+# Check SMS poll daemon log for errors indicating failures in the charging
+# process to QSP.
+
+# -- Internal variables -------------------------------------------------------
+
+script_name=$(basename "$0")
+
+sms_log="{{ tuxedo_logs_path }}/${USER}/sms_poll.log"
+sms_log_lines="50"
+
+error_threshold="0"
+error_threshold_exceeded="false"
+
+scripts_dir="${HOME}/deployment/scripts"
+
+# -- General ------------------------------------------------------------------
+
+check_user () {
+    if [[ "${USER}" == "root" ]]; then
+        echo "${script_name}: This script should be executed as a Tuxedo service user not root"
+        exit 1
+    fi
+}
+
+create_mail_file () {
+    mail_file=$(mktemp -t qsp_check.XXXXXXX)
+    if [[ $? -ne 0 ]]; then
+        echo "Unable to create temporary mail file" >&2
+        exit 1
+    fi
+}
+
+check_errors () {
+    local error_types=(
+        "Ferror"
+        "tperror"
+        "tpalloc"
+    )
+
+    local error_total=0
+
+    for error in "${error_types[@]}"; do
+        (( error_total += $(tail -${sms_log_lines} "${sms_log}" | grep -c "${error}") ))
+    done
+
+    if [[ ${error_total} -gt ${error_threshold} ]]; then
+        "${scripts_dir}/sms_poll_stop"
+        "${scripts_dir}/sms_poll_start"
+        echo -e "There has been a failure in the charging process to QSP from the SCUD polling program, this implies a charging problem on the publ ois users. Check sms_poll.log for : Ferror, tperror or tpalloc. The polling program has been restarted.\n" >> "${mail_file}"
+        error_threshold_exceeded="true"
+    fi
+}
+
+delete_mail_file () {
+    rm -f "${mail_file}"
+}
+
+# -- Alerts -------------------------------------------------------------------
+
+send_alert () {
+    local subject="$1"
+    local mail_file="$2"
+{% if alerts.enabled %}
+    mailx -r "${USER}@$(hostname)" -s "${subject}" {% for recipient in alerts_config.qsp_check %}{{ recipient }} {% endfor %}< "${mail_file}"
+{% else %}
+    echo "Alerts disabled; no mail message(s) will be generated"
+{% endif %}
+}
+
+# -- Entrypoint ---------------------------------------------------------------
+
+main () {
+    check_user
+    create_mail_file
+    check_errors
+
+    if [[ "${error_threshold_exceeded}" == "true" ]]; then
+        send_alert "WARNING - QSP_Failure" "${mail_file}"
+    fi
+
+    delete_mail_file
+}
+
+main "${@}"
