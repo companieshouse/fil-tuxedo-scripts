@@ -28,8 +28,8 @@ check_daemon () {
 
     if [[ -z "${daemon_pid}" ]]; then
         echo "${script_name}: daemon is not running" >&2
-    	echo "SMS Polling program has stopped" >> "${mail_file}"
-    	echo -e "Automatic restart has NOT been initiated\n" >> "${mail_file}"
+        echo "SMS Polling program has stopped" >> "${mail_file}"
+        echo -e "Automatic restart has NOT been initiated\n" >> "${mail_file}"
     else
         echo "${script_name}: daemon is running (${daemon_pid})"
     fi
