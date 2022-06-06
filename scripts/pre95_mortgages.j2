@@ -51,8 +51,8 @@ unload_db_rows () {
     dbaccess "${database}" <<EOF >/dev/null 2>&1
 unload to "${unload_file}"
 select company_number from orders
-        where ( order_date_out = (today - 1) or order_date = (today - 1) )  and
-        order_status = "Z";
+where ( order_date_out = (today - 1) or order_date = (today - 1) )  and
+order_status = "Z";
 EOF
 }
 
