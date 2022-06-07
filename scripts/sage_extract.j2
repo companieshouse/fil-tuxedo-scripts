@@ -23,7 +23,7 @@ check_user () {
 }
 
 create_unload_file () {
-    unload_file=$(mktemp -t unload_file.XXXXXXX)
+    unload_file=$(mktemp -t ${script_name}.XXXXXXX)
     if [[ $? -ne 0 ]]; then
         echo "Unable to create temporary unload file" >&2
         exit 1

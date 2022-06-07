@@ -19,7 +19,7 @@ check_user () {
 }
 
 create_mail_file () {
-    mail_file=$(mktemp -t transmission_check.XXXXXXX)
+    mail_file=$(mktemp -t ${script_name}.XXXXXXX)
     if [[ $? -ne 0 ]]; then
         echo "Unable to create temporary mail file" >&2
         exit 1
