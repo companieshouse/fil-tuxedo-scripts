@@ -17,7 +17,7 @@ reqdate=${1-TODAY}
 
 check_user () {
     if [[ "${USER}" == "root" ]]; then
-        echo "${script_name}: This script should be executed as a Tuxedo service user not root"
+        echo "${script_name}: This script should be executed as a Tuxedo service user not root" >&2
         exit 1
     fi
 }
