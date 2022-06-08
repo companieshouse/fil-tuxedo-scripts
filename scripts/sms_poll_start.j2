@@ -20,7 +20,7 @@ check_user () {
 }
 
 check_daemon () {
-    if [[ -n "$(pgrep -u ${USER} SMS_poll)" ]]; then
+    if [[ -n "$(pgrep -u ${USER} -x SMS_poll)" ]]; then
         echo "${script_name}: SMS poll daemon is already running" >&2
         exit 1
     fi

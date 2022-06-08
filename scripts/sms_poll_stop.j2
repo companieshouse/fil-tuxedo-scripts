@@ -18,14 +18,14 @@ check_user () {
 }
 
 check_daemon () {
-    if [[ -z "$(pgrep -u ${USER} SMS_poll)" ]]; then
+    if [[ -z "$(pgrep -u ${USER} -x SMS_poll)" ]]; then
         echo "${script_name}: SMS poll daemon is not running" >&2
         exit 1
     fi
 }
 
 stop_daemon () {
-    local daemon_pid="$(pgrep -u ${USER} SMS_poll)"
+    local daemon_pid="$(pgrep -u ${USER} -x SMS_poll)"
 
     echo "${script_name}: stopping SMS poll daemon"
     kill -s SIGTERM "${daemon_pid}"

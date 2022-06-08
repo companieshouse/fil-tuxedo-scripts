@@ -24,7 +24,7 @@ create_mail_file () {
 }
 
 check_daemon () {
-    local daemon_pid=$(pgrep -u ${USER} SMS_poll)
+    local daemon_pid=$(pgrep -u ${USER} -x SMS_poll)
 
     if [[ -z "${daemon_pid}" ]]; then
         echo "${script_name}: daemon is not running" >&2
