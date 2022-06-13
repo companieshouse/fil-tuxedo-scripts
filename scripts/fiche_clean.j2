@@ -9,15 +9,15 @@ file_max_age_days=7
 
 # -- General ------------------------------------------------------------------
 
-delete_outdated_files () {
-    echo "Deleting outdated files:"
+delete_fiche_files () {
+    echo "Deleting fiche files:"
     find "${fiche_dir}" -type f -mtime +"${file_max_age_days}" -delete -print
 }
 
 # -- Entrypoint ---------------------------------------------------------------
 
 main () {
-    delete_outdated_files
+    delete_fiche_files
 }
 
 main "${@}"

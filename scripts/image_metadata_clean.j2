@@ -15,12 +15,13 @@ check_user () {
     fi
 }
 
-delete_text_files () {
+delete_image_metadata_files () {
     if [[ -z "${TXT_DIR}" ]]; then
         echo "${script_name}: Mandatory environment variable TXT_DIR not set" >&2
         exit 1
     else
-        find "${TXT_DIR}" -type f -maxdepth 1 -delete
+        echo "Deleting image metadata files:"
+        find "${TXT_DIR}" -type f -maxdepth 1 -delete -print
     fi
 }
 
@@ -28,7 +29,7 @@ delete_text_files () {
 
 main () {
     check_user
-    delete_text_files
+    delete_image_metadata_files
 }
 
 main "${@}"
