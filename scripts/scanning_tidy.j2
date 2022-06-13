@@ -22,13 +22,15 @@ dir_prefixes=(
 # -- General ------------------------------------------------------------------
 
 delete_outdated_files () {
-    find "${scan_dir}" -type f \( -name '*.TIF' -o -name '*.BSJ' \) -mtime +"${file_max_age_days}" -delete
-    find "${scan_dir}" -type l -mtime +"${file_max_age_days}" -delete
+    echo "Deleting outdated files:"
+    find "${scan_dir}" -type f \( -name '*.TIF' -o -name '*.BSJ' \) -mtime +"${file_max_age_days}" -delete -print
+    find "${scan_dir}" -type l -mtime +"${file_max_age_days}" -delete -print
 }
 
-delete_scannning_directories () {
+delete_empty_directories () {
+    echo "Deleting empty directories:"
     for prefix in "${dir_prefixes[@]}"; do
-        find "${scan_dir}" -maxdepth 1 -type d -name "${prefix}"* -empty -delete
+        find "${scan_dir}" -maxdepth 1 -type d -name "${prefix}"* -empty -delete -print
     done
 }
 
@@ -36,7 +38,7 @@ delete_scannning_directories () {
 
 main () {
     delete_outdated_files
-    delete_scannning_directories
+    delete_empty_directories
 }
 
 main "${@}"
