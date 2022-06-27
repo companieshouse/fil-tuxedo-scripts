@@ -71,8 +71,7 @@ delete_mail_file () {
 
 send_stats () {
 {% if stats.enabled %}
-    local temp_dir
-    temp_dir=$(mktemp -d -t prod_stats.XXXXXXX)
+    local temp_dir; temp_dir=$(mktemp -d -t prod_stats.XXXXXXX)
     if [[ $? -ne 0 ]]; then
         echo "Unable to create temporary mail directory" >&2
         exit 1
