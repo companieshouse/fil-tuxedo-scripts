@@ -1,0 +1,587 @@
+#!/bin/bash
+
+# Generate weekly statistics for scud service and send by email.
+
+source {{ informix_install_path }}/etc/informix.env.${USER}
+
+# -- Internal variables -------------------------------------------------------
+
+script_name=$(basename "$0")
+
+database="scud"
+
+today=$(date '+%d/%m/%y')
+
+# -- General ------------------------------------------------------------------
+
+check_user () {
+    if [[ "${USER}" == "root" ]]; then
+        echo "${script_name}: This script should be executed as a Tuxedo service user not root" >&2
+        exit 1
+    fi
+}
+
+create_mail_file () {
+    mail_file=$(mktemp -t scud_stats.XXXXXXX)
+    if [[ $? -ne 0 ]]; then
+        echo "Unable to create temporary mail file" >&2
+        exit 1
+    fi
+}
+
+append_mail_file () {
+    local message="$1"
+    echo -e "${message}" >> "${mail_file}"
+}
+
+exit_on_errror () {
+    local exit_code="$1"
+    local message="$2"
+    if [[ "${exit_code}" -ne 0 ]]; then
+        echo "${message}" >&2
+        exit 1
+    fi
+}
+
+add_stats_header () {
+    append_mail_file "SCUD Statistics for week ending ${today}"
+    append_mail_file "==================================\n\n\n"
+}
+
+add_orders_received_header () {
+    append_mail_file "ORDERS REC'D"
+}
+
+add_orders_transmitted_header () {
+    append_mail_file "ORDERS TRANSMITTED"
+}
+
+add_orders_cancelled_header () {
+    append_mail_file "ORDERS STOPPED / CANCELLED"
+}
+
+add_pre95_missing_documents_header () {
+    append_mail_file "\n\nPre 1995 Missing Documents (>30)\n"
+    append_mail_file "Type\t\t\tNo. Ordered"
+}
+
+add_post95_missing_documents_header () {
+    append_mail_file "\n\nPost 1995 Missing Documents (>10)\n"
+    append_mail_file "Type\t\t\tNo. Ordered"
+}
+
+add_pre95_top_customers_header () {
+    append_mail_file "\n\n\nPre 1995 Packages - Top 10 Customers\n"
+    append_mail_file "Acc No.\t\tQty\t\tName"
+}
+
+add_pre95m_top_customers_header () {
+    append_mail_file "\n\n\nPre 1995 Mortgage Packages - Top 10 Customers\n"
+    append_mail_file "Acc No.\t\tQty\t\tName"
+}
+
+add_ind_pre95_top_customers_header () {
+    append_mail_file "\n\n\nInd Pre 1995 Docs - Top 10 Customers\n"
+    append_mail_file "Acc No.\t\tQty\t\tName"
+}
+
+add_scud_order_total () {
+    local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
+    exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
+
+    dbaccess scud <<EOF 2>/dev/null
+unload to "${temp_file}"
+select count(*) from orders where order_date > (today - 7) and
+order_date <= (today) and
+(document_type is not NULL) and
+(registered_date is not NULL);
+EOF
+
+    local total_scud_orders=$(cut -f1 -d '.' ${temp_file})
+    append_mail_file "Total SCUD orders received: ${total_scud_orders}"
+
+    rm -f "${temp_file}"
+    exit_on_error "$?" "Unable to remove temporary file (${FUNCNAME[0]}:${LINENO})"
+}
+
+add_scud_order_completion_count () {
+    local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
+    exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
+
+    dbaccess scud <<EOF 2>/dev/null
+unload to "${temp_file}"
+select count(*) from orders where order_date > (today - 7) and
+order_date <= (today) and
+order_status = "T" and
+(document_type is not NULL) and
+(registered_date is not NULL);
+EOF
+
+    local completed_scud_orders=$(cut -f1 -d '.' ${temp_file})
+    append_mail_file "SCUD orders completed and transmitted: ${completed_scud_orders}"
+
+    rm -f "${temp_file}"
+    exit_on_error "$?" "Unable to remove temporary file (${FUNCNAME[0]}:${LINENO})"
+}
+
+add_pre95_count () {
+    local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
+    exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
+
+    dbaccess scud <<EOF 2>/dev/null
+unload to "${temp_file}"
+select count(*) from orders where order_date > (today - 7) and
+order_date <= today and
+document_type = "PRE95";
+EOF
+
+    local pre95_count=$(cut -f1 -d '.' ${temp_file})
+    append_mail_file "\t Pre95 Package       ${pre95_count}"
+
+    rm -f "${temp_file}"
+    exit_on_error "$?" "Unable to remove temporary file (${FUNCNAME[0]}:${LINENO})"
+}
+
+add_pre95m_count () {
+    local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
+    exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
+
+    dbaccess scud <<EOF 2>/dev/null
+unload to "${temp_file}"
+select count(*) from orders where order_date > (today - 7) and
+order_date <= today and
+document_type = "PRE95M";
+EOF
+
+    local pre95m_count=$(cut -f1 -d '.' ${temp_file})
+    append_mail_file "\t Pre95M Package      ${pre95m_count}"
+
+    rm -f "${temp_file}"
+    exit_on_error "$?" "Unable to remove temporary file (${FUNCNAME[0]}:${LINENO})"
+}
+
+add_ind_pre95_count () {
+    local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
+    exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
+
+    dbaccess scud <<EOF 2>/dev/null
+unload to "${temp_file}"
+select count(*) from orders where order_date > (today - 7) and
+order_date <= today and
+document_type <> "PRE95" and
+document_type <> "PRE95M" and
+registered_date < "01/01/1995";
+EOF
+
+    local ind_pre95_count=$(cut -f1 -d '.' ${temp_file})
+    append_mail_file "\t Ind Pre95 Doc       ${ind_pre95_count}"
+
+    rm -f "${temp_file}"
+    exit_on_error "$?" "Unable to remove temporary file (${FUNCNAME[0]}:${LINENO})"
+}
+
+add_missing_post95_count () {
+    local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
+    exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
+
+    dbaccess scud <<EOF 2>/dev/null
+unload to "${temp_file}"
+select count(*) from orders where order_date > (today - 7) and
+order_date <= today  and
+document_type <> "PRE95" and
+document_type <> "PRE95M" and
+registered_date >= "01/01/1995";
+EOF
+
+    local missing_post95_count=$(cut -f1 -d '.' ${temp_file})
+    append_mail_file "\t Missing Post95 Doc  ${missing_post95_count}\n"
+
+    rm -f "${temp_file}"
+    exit_on_error "$?" "Unable to remove temporary file (${FUNCNAME[0]}:${LINENO})"
+}
+
+add_transmitted_pre95_count () {
+    local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
+    exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
+
+    dbaccess scud <<EOF 2>/dev/null
+unload to "${temp_file}"
+select count(*) from orders where order_date > (today - 7) and
+order_date <= today and
+document_type = "PRE95" and
+order_status = "T";
+EOF
+
+    local transmitted_pre95_count=$(cut -f1 -d '.' ${temp_file})
+    append_mail_file "\t Pre95 Package       ${transmitted_pre95_count}"
+
+    rm -f "${temp_file}"
+    exit_on_error "$?" "Unable to remove temporary file (${FUNCNAME[0]}:${LINENO})"
+}
+
+add_transmitted_pre95m_count () {
+    local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
+    exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
+
+    dbaccess scud <<EOF 2>/dev/null
+unload to "${temp_file}"
+select count(*) from orders where order_date > (today - 7) and
+order_date <= today and
+document_type = "PRE95M" and
+order_status = "T";
+EOF
+
+    local transmitted_pre95m_count=$(cut -f1 -d '.' ${temp_file})
+    append_mail_file "\t Pre95M Package      ${transmitted_pre95m_count}"
+
+    rm -f "${temp_file}"
+    exit_on_error "$?" "Unable to remove temporary file (${FUNCNAME[0]}:${LINENO})"
+}
+
+add_transmitted_ind_pre95_count () {
+    local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
+    exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
+
+    dbaccess scud <<EOF 2>/dev/null
+unload to "${temp_file}"
+select count(*) from orders where order_date > (today - 7)  and
+order_date <= today and
+document_type <> "PRE95" and
+document_type <> "PRE95M" and
+registered_date < "01/01/1995" and
+order_status = "T";
+EOF
+
+    local transmitted_ind_pre95_count=$(cut -f1 -d '.' ${temp_file})
+    append_mail_file "\t Ind Pre95 Doc       ${transmitted_ind_pre95_count}"
+
+    rm -f "${temp_file}"
+    exit_on_error "$?" "Unable to remove temporary file (${FUNCNAME[0]}:${LINENO})"
+}
+
+add_transmitted_missing_post95_count () {
+    local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
+    exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
+
+    dbaccess scud <<EOF 2>/dev/null
+unload to "${temp_file}"
+select count(*) from orders where order_date > (today - 7)  and
+order_date <= today and
+document_type <> "PRE95" and
+document_type <> "PRE95M" and
+registered_date >= "01/01/1995" and
+order_status = "T";
+EOF
+
+    local transmitted_missing_post95_count=$(cut -f1 -d '.' ${temp_file})
+    append_mail_file "\t Missing Post95 Doc  ${transmitted_missing_post95_count}\n"
+
+    rm -f "${temp_file}"
+    exit_on_error "$?" "Unable to remove temporary file (${FUNCNAME[0]}:${LINENO})"
+}
+
+add_cancelled_pre95_count () {
+    local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
+    exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
+
+    dbaccess scud <<EOF 2>/dev/null
+unload to "${temp_file}"
+select count(*) from orders where order_date > (today - 7) and
+order_date <= today and
+document_type = "PRE95" and
+( order_status = "S" or
+order_status = "C" );
+EOF
+
+    local cancelled_pre95_count=$(cut -f1 -d '.' ${temp_file})
+    append_mail_file "\t Pre95 Package       ${cancelled_pre95_count}"
+
+    rm -f "${temp_file}"
+    exit_on_error "$?" "Unable to remove temporary file (${FUNCNAME[0]}:${LINENO})"
+}
+
+add_cancelled_pre95m_count () {
+    local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
+    exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
+
+    dbaccess scud <<EOF 2>/dev/null
+unload to "${temp_file}"
+select count(*) from orders where order_date > (today - 7)  and
+order_date <= today and
+document_type = "PRE95M" and
+( order_status = "S" or
+order_status = "C" );
+EOF
+
+    local cancelled_pre95m_count=$(cut -f1 -d '.' ${temp_file})
+    append_mail_file "\t Pre95M Package       ${cancelled_pre95m_count}"
+
+    rm -f "${temp_file}"
+    exit_on_error "$?" "Unable to remove temporary file (${FUNCNAME[0]}:${LINENO})"
+}
+
+add_cancelled_ind_pre95_count () {
+    local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
+    exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
+
+    dbaccess scud <<EOF 2>/dev/null
+unload to "${temp_file}"
+select count(*) from orders where order_date > (today - 7)  and
+order_date <= today and
+document_type <> "PRE95" and
+document_type <> "PRE95M" and
+registered_date < "01/01/1995" and
+( order_status = "S" or
+order_status = "C" );
+EOF
+
+    local cancelled_ind_pre95_count=$(cut -f1 -d '.' ${temp_file})
+    append_mail_file "\t Ind Pre95 Doc       ${cancelled_ind_pre95_count}"
+
+    rm -f "${temp_file}"
+    exit_on_error "$?" "Unable to remove temporary file (${FUNCNAME[0]}:${LINENO})"
+}
+
+add_cancelled_missing_post95_count () {
+    local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
+    exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
+
+    dbaccess scud <<EOF 2>/dev/null
+unload to "${temp_file}"
+select count(*) from orders where order_date > (today - 7)  and
+order_date <= today and
+document_type <> "PRE95" and
+document_type <> "PRE95M" and
+registered_date >= "01/01/1995" and
+( order_status = "S" or
+order_status = "C" );
+EOF
+
+    local cancelled_missing_post95_count=$(cut -f1 -d '.' ${temp_file})
+    append_mail_file "\t Missing Post95 Doc  ${cancelled_missing_post95_count}\n"
+
+    rm -f "${temp_file}"
+    exit_on_error "$?" "Unable to remove temporary file (${FUNCNAME[0]}:${LINENO})"
+}
+
+
+
+
+
+
+add_pre95_missing_documents_count () {
+    local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
+    exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
+
+    dbaccess scud <<EOF 2>/dev/null
+unload to "${temp_file}"
+select document_type, COUNT(*) from orders
+where order_date > (today - 7) and
+order_date <= today and
+document_type <> "PRE95" and
+document_type <> "PRE95M" and
+registered_date < "01/01/1995" and
+order_status = "T"
+GROUP BY document_type
+HAVING COUNT(*) > 30
+ORDER BY 2 DESC;
+EOF
+
+    local document_type_min_col_width="9"
+
+    while read -r line; do
+        local document_type=$(echo "${line}" | cut -f1 -d '|')
+        local document_count=$(echo "${line}" | cut -f2 -d '|' | cut -f1 -d '.')
+
+        if [[ "$(wc -c <<< ${document_type} )" -lt "${document_type_min_col_width}" ]]; then
+            append_mail_file "${document_type}\t\t\t${document_count}"
+        else
+            append_mail_file "${document_type}\t\t${document_count}"
+        fi
+    done < "${temp_file}"
+
+    rm -f "${temp_file}"
+    exit_on_error "$?" "Unable to remove temporary file (${FUNCNAME[0]}:${LINENO})"
+}
+
+
+add_post95_missing_documents_count () {
+    local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
+    exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
+
+    dbaccess scud <<EOF 2>/dev/null
+unload to "${temp_file}"
+select document_type, COUNT(*) from orders
+where order_date > (today - 7) and
+order_date <= today and
+document_type <> "PRE95" and
+document_type <> "PRE95M" and
+registered_date >= "01/01/1995" and
+order_status = "T"
+GROUP BY document_type
+HAVING COUNT(*) > 10
+ORDER BY 2 DESC;
+EOF
+
+    local document_type_min_col_width="9"
+
+    while read -r line; do
+        local document_type=$(echo "${line}" | cut -f1 -d '|')
+        local document_count=$(echo "${line}" | cut -f2 -d '|' | cut -f1 -d '.')
+
+        if [[ "$(wc -c <<< ${document_type} )" -lt "${document_type_min_col_width}" ]]; then
+            append_mail_file "${document_type}\t\t\t${document_count}"
+        else
+            append_mail_file "${document_type}\t\t${document_count}"
+        fi
+    done < "${temp_file}"
+
+
+
+    rm -f "${temp_file}"
+    exit_on_error "$?" "Unable to remove temporary file (${FUNCNAME[0]}:${LINENO})"
+}
+
+add_pre95_top_customers () {
+    local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
+    exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
+
+    dbaccess scud <<EOF 2>/dev/null
+unload to "${temp_file}"
+select account_number, address_1, COUNT(*) from orders
+where order_date > (today - 7)  and
+order_date <= today       and
+document_type = "PRE95" and
+order_status = "T"
+GROUP BY account_number, address_1
+ORDER BY 3 DESC;
+EOF
+
+    while read -r line; do
+        local account_number=$(echo "${line}" | cut -f1 -d '|')
+        local address_line_one=$(echo "${line}" | cut -f2 -d '|')
+        local count=$(echo "${line}" | cut -f3 -d '|' | cut -f1 -d '.')
+        append_mail_file "${account_number}\t${count}\t\t${address_line_one}"
+    done < <(head -10 ${temp_file} | sed s/\ /_/g)
+
+    rm -f "${temp_file}"
+    exit_on_error "$?" "Unable to remove temporary file (${FUNCNAME[0]}:${LINENO})"
+}
+
+add_pre95m_top_customers () {
+    local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
+    exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
+
+    dbaccess scud <<EOF 2>/dev/null
+unload to "${temp_file}"
+select account_number, address_1, COUNT(*) from orders
+where order_date > (today - 7) and
+order_date <= today and
+document_type = "PRE95M" and
+order_status = "T"
+GROUP BY account_number, address_1
+ORDER BY 3 DESC;
+EOF
+
+    while read -r line; do
+        local account_number=$(echo "${line}" | cut -f1 -d '|')
+        local address_line_one=$(echo "${line}" | cut -f2 -d '|')
+        local count=$(echo "${line}" | cut -f3 -d '|' | cut -f1 -d '.')
+        append_mail_file "${account_number}\t${count}\t\t${address_line_one}"
+    done < <(head -10 ${temp_file} | sed s/\ /_/g)
+
+    rm -f "${temp_file}"
+    exit_on_error "$?" "Unable to remove temporary file (${FUNCNAME[0]}:${LINENO})"
+}
+
+add_ind_pre95_top_customers () {
+    local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
+    exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
+
+    dbaccess scud <<EOF 2>/dev/null
+unload to "${temp_file}"
+select account_number, address_1, COUNT(*) from orders
+where order_date > (today - 7) and
+order_date <= today and
+registered_date < "01/01/1995" and
+document_type <> "PRE95" and
+document_type <> "PRE95M" and
+order_status = "T"
+GROUP BY account_number, address_1
+ORDER BY 3 DESC;
+EOF
+
+    while read -r line; do
+        local account_number=$(echo "${line}" | cut -f1 -d '|')
+        local address_line_one=$(echo "${line}" | cut -f2 -d '|')
+        local count=$(echo "${line}" | cut -f3 -d '|' | cut -f1 -d '.')
+        append_mail_file "${account_number}\t${count}\t\t${address_line_one}"
+    done < <(head -10 ${temp_file} | sed s/\ /_/g)
+
+    rm -f "${temp_file}"
+    exit_on_error "$?" "Unable to remove temporary file (${FUNCNAME[0]}:${LINENO})"
+}
+
+delete_mail_file () {
+    rm -f "${mail_file}"
+}
+
+# -- Stats --------------------------------------------------------------------
+
+send_stats () {
+{% if stats.enabled %}
+    mailx -s "INFO - Scud Stats for Week Ending Friday ${today}" {% for recipient in stats_config.recipients %}{{ recipient }} {% endfor %}< "${mail_file}"
+{% else %}
+    echo "Stats disabled; no file(s) will be sent"
+{% endif %}
+}
+
+# -- Entrypoint ---------------------------------------------------------------
+
+main () {
+    check_user
+    create_mail_file
+
+    add_stats_header
+    add_scud_order_total
+    add_scud_order_completion_count
+
+    add_orders_received_header
+    add_pre95_count
+    add_pre95m_count
+    add_ind_pre95_count
+    add_missing_post95_count
+
+    add_orders_transmitted_header
+    add_transmitted_pre95_count
+    add_transmitted_pre95m_count
+    add_transmitted_ind_pre95_count
+    add_transmitted_missing_post95_count
+
+    add_orders_cancelled_header
+    add_cancelled_pre95_count
+    add_cancelled_pre95m_count
+    add_cancelled_ind_pre95_count
+    add_cancelled_missing_post95_count
+
+    add_pre95_missing_documents_header
+    add_pre95_missing_documents_count
+
+    add_post95_missing_documents_header
+    add_post95_missing_documents_count
+
+    add_pre95_top_customers_header
+    add_pre95_top_customers
+
+    add_pre95m_top_customers_header
+    add_pre95m_top_customers
+
+    add_ind_pre95_top_customers_header
+    add_ind_pre95_top_customers
+
+    send_stats
+
+    delete_mail_file
+}
+
+main "${@}"
