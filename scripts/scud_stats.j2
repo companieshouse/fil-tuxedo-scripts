@@ -2,7 +2,7 @@
 
 # Generate weekly statistics for scud service and send by email.
 
-source {{ informix_install_path }}/etc/informix.env.${USER}
+source "{{ informix_install_path }}/etc/informix.env.${USER}"
 
 # -- Internal variables -------------------------------------------------------
 
@@ -97,7 +97,7 @@ order_date <= (today) and
 (registered_date is not NULL);
 EOF
 
-    local total_scud_orders=$(cut -f1 -d '.' ${temp_file})
+    local total_scud_orders=$(cut -f1 -d '.' "${temp_file}")
     append_mail_file "Total SCUD orders received: ${total_scud_orders}"
 
     rm -f "${temp_file}"
@@ -117,7 +117,7 @@ order_status = "T" and
 (registered_date is not NULL);
 EOF
 
-    local completed_scud_orders=$(cut -f1 -d '.' ${temp_file})
+    local completed_scud_orders=$(cut -f1 -d '.' "${temp_file}")
     append_mail_file "SCUD orders completed and transmitted: ${completed_scud_orders}"
 
     rm -f "${temp_file}"
@@ -135,7 +135,7 @@ order_date <= today and
 document_type = "PRE95";
 EOF
 
-    local pre95_count=$(cut -f1 -d '.' ${temp_file})
+    local pre95_count=$(cut -f1 -d '.' "${temp_file}")
     append_mail_file "\t Pre95 Package       ${pre95_count}"
 
     rm -f "${temp_file}"
@@ -153,7 +153,7 @@ order_date <= today and
 document_type = "PRE95M";
 EOF
 
-    local pre95m_count=$(cut -f1 -d '.' ${temp_file})
+    local pre95m_count=$(cut -f1 -d '.' "${temp_file}")
     append_mail_file "\t Pre95M Package      ${pre95m_count}"
 
     rm -f "${temp_file}"
@@ -173,7 +173,7 @@ document_type <> "PRE95M" and
 registered_date < "01/01/1995";
 EOF
 
-    local ind_pre95_count=$(cut -f1 -d '.' ${temp_file})
+    local ind_pre95_count=$(cut -f1 -d '.' "${temp_file}")
     append_mail_file "\t Ind Pre95 Doc       ${ind_pre95_count}"
 
     rm -f "${temp_file}"
@@ -193,7 +193,7 @@ document_type <> "PRE95M" and
 registered_date >= "01/01/1995";
 EOF
 
-    local missing_post95_count=$(cut -f1 -d '.' ${temp_file})
+    local missing_post95_count=$(cut -f1 -d '.' "${temp_file}")
     append_mail_file "\t Missing Post95 Doc  ${missing_post95_count}\n"
 
     rm -f "${temp_file}"
@@ -212,7 +212,7 @@ document_type = "PRE95" and
 order_status = "T";
 EOF
 
-    local transmitted_pre95_count=$(cut -f1 -d '.' ${temp_file})
+    local transmitted_pre95_count=$(cut -f1 -d '.' "${temp_file}")
     append_mail_file "\t Pre95 Package       ${transmitted_pre95_count}"
 
     rm -f "${temp_file}"
@@ -231,7 +231,7 @@ document_type = "PRE95M" and
 order_status = "T";
 EOF
 
-    local transmitted_pre95m_count=$(cut -f1 -d '.' ${temp_file})
+    local transmitted_pre95m_count=$(cut -f1 -d '.' "${temp_file}")
     append_mail_file "\t Pre95M Package      ${transmitted_pre95m_count}"
 
     rm -f "${temp_file}"
@@ -252,7 +252,7 @@ registered_date < "01/01/1995" and
 order_status = "T";
 EOF
 
-    local transmitted_ind_pre95_count=$(cut -f1 -d '.' ${temp_file})
+    local transmitted_ind_pre95_count=$(cut -f1 -d '.' "${temp_file}")
     append_mail_file "\t Ind Pre95 Doc       ${transmitted_ind_pre95_count}"
 
     rm -f "${temp_file}"
@@ -273,7 +273,7 @@ registered_date >= "01/01/1995" and
 order_status = "T";
 EOF
 
-    local transmitted_missing_post95_count=$(cut -f1 -d '.' ${temp_file})
+    local transmitted_missing_post95_count=$(cut -f1 -d '.' "${temp_file}")
     append_mail_file "\t Missing Post95 Doc  ${transmitted_missing_post95_count}\n"
 
     rm -f "${temp_file}"
@@ -293,7 +293,7 @@ document_type = "PRE95" and
 order_status = "C" );
 EOF
 
-    local cancelled_pre95_count=$(cut -f1 -d '.' ${temp_file})
+    local cancelled_pre95_count=$(cut -f1 -d '.' "${temp_file}")
     append_mail_file "\t Pre95 Package       ${cancelled_pre95_count}"
 
     rm -f "${temp_file}"
@@ -313,7 +313,7 @@ document_type = "PRE95M" and
 order_status = "C" );
 EOF
 
-    local cancelled_pre95m_count=$(cut -f1 -d '.' ${temp_file})
+    local cancelled_pre95m_count=$(cut -f1 -d '.' "${temp_file}")
     append_mail_file "\t Pre95M Package       ${cancelled_pre95m_count}"
 
     rm -f "${temp_file}"
@@ -335,7 +335,7 @@ registered_date < "01/01/1995" and
 order_status = "C" );
 EOF
 
-    local cancelled_ind_pre95_count=$(cut -f1 -d '.' ${temp_file})
+    local cancelled_ind_pre95_count=$(cut -f1 -d '.' "${temp_file}")
     append_mail_file "\t Ind Pre95 Doc       ${cancelled_ind_pre95_count}"
 
     rm -f "${temp_file}"
@@ -357,7 +357,7 @@ registered_date >= "01/01/1995" and
 order_status = "C" );
 EOF
 
-    local cancelled_missing_post95_count=$(cut -f1 -d '.' ${temp_file})
+    local cancelled_missing_post95_count=$(cut -f1 -d '.' "${temp_file}")
     append_mail_file "\t Missing Post95 Doc  ${cancelled_missing_post95_count}\n"
 
     rm -f "${temp_file}"
