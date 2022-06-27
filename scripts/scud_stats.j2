@@ -364,11 +364,6 @@ EOF
     exit_on_error "$?" "Unable to remove temporary file (${FUNCNAME[0]}:${LINENO})"
 }
 
-
-
-
-
-
 add_pre95_missing_documents_count () {
     local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
@@ -404,7 +399,6 @@ EOF
     exit_on_error "$?" "Unable to remove temporary file (${FUNCNAME[0]}:${LINENO})"
 }
 
-
 add_post95_missing_documents_count () {
     local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
@@ -435,8 +429,6 @@ EOF
             append_mail_file "${document_type}\t\t${document_count}"
         fi
     done < "${temp_file}"
-
-
 
     rm -f "${temp_file}"
     exit_on_error "$?" "Unable to remove temporary file (${FUNCNAME[0]}:${LINENO})"
