@@ -388,7 +388,7 @@ EOF
         local document_type=$(echo "${line}" | cut -f1 -d '|')
         local document_count=$(echo "${line}" | cut -f2 -d '|' | cut -f1 -d '.')
 
-        if [[ "$(wc -c <<< ${document_type} )" -lt "${document_type_min_col_width}" ]]; then
+        if [[ "$(wc -c <<< "${document_type}" )" -lt "${document_type_min_col_width}" ]]; then
             append_mail_file "${document_type}\t\t\t${document_count}"
         else
             append_mail_file "${document_type}\t\t${document_count}"
@@ -423,7 +423,7 @@ EOF
         local document_type=$(echo "${line}" | cut -f1 -d '|')
         local document_count=$(echo "${line}" | cut -f2 -d '|' | cut -f1 -d '.')
 
-        if [[ "$(wc -c <<< ${document_type} )" -lt "${document_type_min_col_width}" ]]; then
+        if [[ "$(wc -c <<< "${document_type}" )" -lt "${document_type_min_col_width}" ]]; then
             append_mail_file "${document_type}\t\t\t${document_count}"
         else
             append_mail_file "${document_type}\t\t${document_count}"
@@ -454,7 +454,7 @@ EOF
         local address_line_one=$(echo "${line}" | cut -f2 -d '|')
         local count=$(echo "${line}" | cut -f3 -d '|' | cut -f1 -d '.')
         append_mail_file "${account_number}\t${count}\t\t${address_line_one}"
-    done < <(head -10 ${temp_file} | sed s/\ /_/g)
+    done < <(head -10 "${temp_file}" | sed s/\ /_/g)
 
     rm -f "${temp_file}"
     exit_on_error "$?" "Unable to remove temporary file (${FUNCNAME[0]}:${LINENO})"
@@ -480,7 +480,7 @@ EOF
         local address_line_one=$(echo "${line}" | cut -f2 -d '|')
         local count=$(echo "${line}" | cut -f3 -d '|' | cut -f1 -d '.')
         append_mail_file "${account_number}\t${count}\t\t${address_line_one}"
-    done < <(head -10 ${temp_file} | sed s/\ /_/g)
+    done < <(head -10 "${temp_file}" | sed s/\ /_/g)
 
     rm -f "${temp_file}"
     exit_on_error "$?" "Unable to remove temporary file (${FUNCNAME[0]}:${LINENO})"
@@ -508,7 +508,7 @@ EOF
         local address_line_one=$(echo "${line}" | cut -f2 -d '|')
         local count=$(echo "${line}" | cut -f3 -d '|' | cut -f1 -d '.')
         append_mail_file "${account_number}\t${count}\t\t${address_line_one}"
-    done < <(head -10 ${temp_file} | sed s/\ /_/g)
+    done < <(head -10 "${temp_file}" | sed s/\ /_/g)
 
     rm -f "${temp_file}"
     exit_on_error "$?" "Unable to remove temporary file (${FUNCNAME[0]}:${LINENO})"
