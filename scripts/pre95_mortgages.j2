@@ -81,11 +81,11 @@ delete_data_file () {
 # -- Alerts -------------------------------------------------------------------
 
 send_alert () {
-# {% if alerts.enabled %}
+{% if alerts.enabled %}
     mailx -r "${USER}@$(hostname)" -s "WARNING - PRE95M file missing" {% for recipient in alerts_config.db_error_check %}{{ recipient }} {% endfor %}< "${mail_file}"
-# {% else %}
+{% else %}
     echo "Alerts disabled; no mail message(s) will be generated"
-# {% endif %}
+{% endif %}
 }
 
 # -- Entrypoint ---------------------------------------------------------------
