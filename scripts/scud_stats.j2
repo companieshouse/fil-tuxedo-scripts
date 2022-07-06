@@ -89,7 +89,7 @@ add_scud_order_total () {
     local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
 
-    dbaccess scud <<EOF 2>/dev/null
+    dbaccess "${database}" <<EOF 2>/dev/null
 unload to "${temp_file}"
 select count(*) from orders where order_date > (today - 7) and
 order_date <= (today) and
@@ -108,7 +108,7 @@ add_scud_order_completion_count () {
     local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
 
-    dbaccess scud <<EOF 2>/dev/null
+    dbaccess "${database}" <<EOF 2>/dev/null
 unload to "${temp_file}"
 select count(*) from orders where order_date > (today - 7) and
 order_date <= (today) and
@@ -128,7 +128,7 @@ add_pre95_count () {
     local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
 
-    dbaccess scud <<EOF 2>/dev/null
+    dbaccess "${database}" <<EOF 2>/dev/null
 unload to "${temp_file}"
 select count(*) from orders where order_date > (today - 7) and
 order_date <= today and
@@ -146,7 +146,7 @@ add_pre95m_count () {
     local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
 
-    dbaccess scud <<EOF 2>/dev/null
+    dbaccess "${database}" <<EOF 2>/dev/null
 unload to "${temp_file}"
 select count(*) from orders where order_date > (today - 7) and
 order_date <= today and
@@ -164,7 +164,7 @@ add_ind_pre95_count () {
     local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
 
-    dbaccess scud <<EOF 2>/dev/null
+    dbaccess "${database}" <<EOF 2>/dev/null
 unload to "${temp_file}"
 select count(*) from orders where order_date > (today - 7) and
 order_date <= today and
@@ -184,7 +184,7 @@ add_missing_post95_count () {
     local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
 
-    dbaccess scud <<EOF 2>/dev/null
+    dbaccess "${database}" <<EOF 2>/dev/null
 unload to "${temp_file}"
 select count(*) from orders where order_date > (today - 7) and
 order_date <= today  and
@@ -204,7 +204,7 @@ add_transmitted_pre95_count () {
     local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
 
-    dbaccess scud <<EOF 2>/dev/null
+    dbaccess "${database}" <<EOF 2>/dev/null
 unload to "${temp_file}"
 select count(*) from orders where order_date > (today - 7) and
 order_date <= today and
@@ -223,7 +223,7 @@ add_transmitted_pre95m_count () {
     local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
 
-    dbaccess scud <<EOF 2>/dev/null
+    dbaccess "${database}" <<EOF 2>/dev/null
 unload to "${temp_file}"
 select count(*) from orders where order_date > (today - 7) and
 order_date <= today and
@@ -242,7 +242,7 @@ add_transmitted_ind_pre95_count () {
     local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
 
-    dbaccess scud <<EOF 2>/dev/null
+    dbaccess "${database}" <<EOF 2>/dev/null
 unload to "${temp_file}"
 select count(*) from orders where order_date > (today - 7)  and
 order_date <= today and
@@ -263,7 +263,7 @@ add_transmitted_missing_post95_count () {
     local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
 
-    dbaccess scud <<EOF 2>/dev/null
+    dbaccess "${database}" <<EOF 2>/dev/null
 unload to "${temp_file}"
 select count(*) from orders where order_date > (today - 7)  and
 order_date <= today and
@@ -284,7 +284,7 @@ add_cancelled_pre95_count () {
     local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
 
-    dbaccess scud <<EOF 2>/dev/null
+    dbaccess "${database}" <<EOF 2>/dev/null
 unload to "${temp_file}"
 select count(*) from orders where order_date > (today - 7) and
 order_date <= today and
@@ -304,7 +304,7 @@ add_cancelled_pre95m_count () {
     local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
 
-    dbaccess scud <<EOF 2>/dev/null
+    dbaccess "${database}" <<EOF 2>/dev/null
 unload to "${temp_file}"
 select count(*) from orders where order_date > (today - 7)  and
 order_date <= today and
@@ -324,7 +324,7 @@ add_cancelled_ind_pre95_count () {
     local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
 
-    dbaccess scud <<EOF 2>/dev/null
+    dbaccess "${database}" <<EOF 2>/dev/null
 unload to "${temp_file}"
 select count(*) from orders where order_date > (today - 7)  and
 order_date <= today and
@@ -346,7 +346,7 @@ add_cancelled_missing_post95_count () {
     local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
 
-    dbaccess scud <<EOF 2>/dev/null
+    dbaccess "${database}" <<EOF 2>/dev/null
 unload to "${temp_file}"
 select count(*) from orders where order_date > (today - 7)  and
 order_date <= today and
@@ -368,7 +368,7 @@ add_pre95_missing_documents_count () {
     local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
 
-    dbaccess scud <<EOF 2>/dev/null
+    dbaccess "${database}" <<EOF 2>/dev/null
 unload to "${temp_file}"
 select document_type, COUNT(*) from orders
 where order_date > (today - 7) and
@@ -403,7 +403,7 @@ add_post95_missing_documents_count () {
     local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
 
-    dbaccess scud <<EOF 2>/dev/null
+    dbaccess "${database}" <<EOF 2>/dev/null
 unload to "${temp_file}"
 select document_type, COUNT(*) from orders
 where order_date > (today - 7) and
@@ -438,7 +438,7 @@ add_pre95_top_customers () {
     local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
 
-    dbaccess scud <<EOF 2>/dev/null
+    dbaccess "${database}" <<EOF 2>/dev/null
 unload to "${temp_file}"
 select account_number, address_1, COUNT(*) from orders
 where order_date > (today - 7)  and
@@ -464,7 +464,7 @@ add_pre95m_top_customers () {
     local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
 
-    dbaccess scud <<EOF 2>/dev/null
+    dbaccess "${database}" <<EOF 2>/dev/null
 unload to "${temp_file}"
 select account_number, address_1, COUNT(*) from orders
 where order_date > (today - 7) and
@@ -490,7 +490,7 @@ add_ind_pre95_top_customers () {
     local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
 
-    dbaccess scud <<EOF 2>/dev/null
+    dbaccess "${database}" <<EOF 2>/dev/null
 unload to "${temp_file}"
 select account_number, address_1, COUNT(*) from orders
 where order_date > (today - 7) and
