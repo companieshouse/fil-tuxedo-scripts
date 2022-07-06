@@ -18,13 +18,13 @@ cabs_min_count=1
 
 check_user () {
     if [[ "${USER}" == "root" ]]; then
-        echo "${script_name}: This script should be executed as a Tuxedo service user not root"
+        echo "${script_name}: This script should be executed as a Tuxedo service user not root" >&2
         exit 1
     fi
 }
 
 create_mail_file () {
-    mail_file=$(mktemp -t cabs_check.XXXXXXX)
+    mail_file=$(mktemp -t ${script_name}.XXXXXXX)
     if [[ $? -ne 0 ]]; then
         echo "Unable to create temporary mail file" >&2
         exit 1

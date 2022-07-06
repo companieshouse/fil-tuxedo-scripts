@@ -1,0 +1,45 @@
+#!/bin/bash
+
+# Start SMS poll daemon to prepare orders for transmission.
+
+# -- Internal variables -------------------------------------------------------
+
+script_name=$(basename "$0")
+
+default_interval="60"
+default_log_file="{{ tuxedo_logs_path }}/${USER}/sms_poll.log"
+default_log_level="3"
+
+# -- General ------------------------------------------------------------------
+
+check_user () {
+    if [[ "${USER}" == "root" ]]; then
+        echo "${script_name}: This script should be executed as a Tuxedo service user not root" >&2
+        exit 1
+    fi
+}
+
+check_daemon () {
+    if [[ -n "$(pgrep -u ${USER} -x SMS_poll)" ]]; then
+        echo "${script_name}: SMS poll daemon is already running" >&2
+        exit 1
+    fi
+}
+
+start_daemon () {
+    local interval="${1:-${default_interval}}"
+    local log_level="${2:-${default_log_level}}"
+    local log_file="${3:-${default_log_file}}"
+
+    SMS_poll "${interval}" "${log_level}" "${log_file}" &
+}
+
+# -- Entrypoint ---------------------------------------------------------------
+
+main () {
+    check_user
+    check_daemon
+    start_daemon "${@}"
+}
+
+main "${@}"

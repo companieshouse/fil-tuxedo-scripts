@@ -18,7 +18,7 @@ end_date="01/$(date '+%m/%Y')"
 
 check_user () {
     if [[ "${USER}" == "root" ]]; then
-        echo "${script_name}: This script should be executed as a Tuxedo service user not root"
+        echo "${script_name}: This script should be executed as a Tuxedo service user not root" >&2
         exit 1
     fi
 }
@@ -71,7 +71,7 @@ delete_mail_file () {
 
 send_stats () {
 {% if stats.enabled %}
-    local temp_dir=$(mktemp -d -t prod_stats.XXXXXXX)
+    local temp_dir; temp_dir=$(mktemp -d -t prod_stats.XXXXXXX)
     if [[ $? -ne 0 ]]; then
         echo "Unable to create temporary mail directory" >&2
         exit 1

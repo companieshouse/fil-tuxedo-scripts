@@ -1,16 +1,10 @@
 #!/bin/bash
 
-# Check prod service logs for errors indicating database update failures.
+# Check status of SMS poll daemon and send alerts if not running.
 
 # -- Internal variables -------------------------------------------------------
 
 script_name=$(basename "$0")
-
-prod_log="{{ tuxedo_logs_path }}/${USER}/prod.log"
-prod_log_lines="25"
-
-error_threshold="0"
-error_threshold_exceeded="false"
 
 # -- General ------------------------------------------------------------------
 
@@ -29,10 +23,15 @@ create_mail_file () {
     fi
 }
 
-check_db_errors () {
-    if [[ $(tail -${prod_log_lines} "${prod_log}" | grep -c "Return code:1200") -gt ${error_threshold} ]]; then
-        echo -e "prod.log file showing return code 1200 message; potential DB update issue, check log to investigate\n" >> "${mail_file}"
-        error_threshold_exceeded="true"
+check_daemon () {
+    local daemon_pid=$(pgrep -u ${USER} -x SMS_poll)
+
+    if [[ -z "${daemon_pid}" ]]; then
+        echo "${script_name}: daemon is not running" >&2
+        echo "SMS Polling program has stopped" >> "${mail_file}"
+        echo -e "Automatic restart has NOT been initiated\n" >> "${mail_file}"
+    else
+        echo "${script_name}: daemon is running (${daemon_pid})"
     fi
 }
 
@@ -43,8 +42,10 @@ delete_mail_file () {
 # -- Alerts -------------------------------------------------------------------
 
 send_alert () {
+    local subject="$1"
+    local mail_file="$2"
 {% if alerts.enabled %}
-    mailx -r "${USER}@$(hostname)" -s "Return code 1200 message in prod.log; potential DB update issue - INVESTIGATE - $(date)" {% for recipient in alerts_config.db_error_check %}{{ recipient }} {% endfor %}< "${mail_file}"
+    mailx -r "${USER}@$(hostname)" -s "${subject}" {% for recipient in alerts_config.sms_poll_check %}{{ recipient }} {% endfor %}< "${mail_file}"
 {% else %}
     echo "Alerts disabled; no mail message(s) will be generated"
 {% endif %}
@@ -53,12 +54,12 @@ send_alert () {
 # -- Entrypoint ---------------------------------------------------------------
 
 main () {
-    create_mail_file
     check_user
-    check_db_errors
+    create_mail_file
+    check_daemon
 
-    if [[ "${error_threshold_exceeded}" == "true" ]]; then
-        send_alert
+    if [[ -s "${mail_file}" ]]; then
+        send_alert "WARNING - SMS Polling" "${mail_file}"
     fi
 
     delete_mail_file

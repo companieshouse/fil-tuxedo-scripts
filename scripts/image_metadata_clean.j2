@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# Delete generated image metadata files.
+
+# -- Internal variables -------------------------------------------------------
+
+script_name=$(basename "$0")
+
+# -- General ------------------------------------------------------------------
+
+check_user () {
+    if [[ "${USER}" == "root" ]]; then
+        echo "${script_name}: This script should be executed as a Tuxedo service user not root" >&2
+        exit 1
+    fi
+}
+
+delete_image_metadata_files () {
+    if [[ -z "${TXT_DIR}" ]]; then
+        echo "${script_name}: Mandatory environment variable TXT_DIR not set" >&2
+        exit 1
+    else
+        echo "Deleting image metadata files:"
+        find "${TXT_DIR}" -type f -maxdepth 1 -delete -print
+    fi
+}
+
+# -- Entrypoint ---------------------------------------------------------------
+
+main () {
+    check_user
+    delete_image_metadata_files
+}
+
+main "${@}"

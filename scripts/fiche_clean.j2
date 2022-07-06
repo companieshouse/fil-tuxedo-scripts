@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# Delete fiche files older than the specified number of days.
+
+# -- Internal variables -------------------------------------------------------
+
+fiche_dir="${HOME}/fiche"
+file_max_age_days=7
+
+# -- General ------------------------------------------------------------------
+
+delete_fiche_files () {
+    echo "Deleting fiche files:"
+    find "${fiche_dir}" -type f -mtime +"${file_max_age_days}" -delete -print
+}
+
+# -- Entrypoint ---------------------------------------------------------------
+
+main () {
+    delete_fiche_files
+}
+
+main "${@}"
