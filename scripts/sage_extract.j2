@@ -42,7 +42,7 @@ create_extracts_file () {
 }
 
 unload_db_rows () {
-    DBDATE=DMY4 dbaccess ${database} <<EOF >/dev/null 2>&1
+    DBDATE=DMY4 dbaccess ${database} - <<EOF >/dev/null 2>&1
 unload to "${unload_file}" delimiter "|"
 select product.inv_session_no,invoice.account_no,
 product.comp_no,invoice.ref,invoice.search_name,invoice.search_addr_1,
