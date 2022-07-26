@@ -1,0 +1,138 @@
+#!/bin/bash
+
+# TODO document
+
+# Copy presenter data to S3 bucket for retreival and processing on backend XML
+# service instances.
+
+source "{{ informix_install_path }}/etc/informix.env.${USER}"
+
+# -- Internal variables -------------------------------------------------------
+
+script_name=$(basename "$0")
+
+database="ef_db"
+
+today=$(date '+%Y-%m-%d')
+yesterday=$(date --date="${today} -1 day")
+presenter_start_date_time=$(date --date="${yesterday}" +'%Y-%m-%d 00:00')
+presenter_end_date_time=$(date --date="${yesterday}" +'%Y-%m-%d 23:59')
+transfer_mode="${WEB_PRES_TRANS_MODE}"
+live_presenter_data_bucket="{{ presenter_data_bucket_name }}"
+test_presenter_data_bucket="{{ presenter_data_bucket_name }}"
+
+# -- General ------------------------------------------------------------------
+
+check_user () {
+    if [[ "${USER}" == "root" ]]; then
+        echo "${script_name}: This script should be executed as a Tuxedo service user not root" >&2
+        exit 1
+    fi
+}
+
+exit_on_error () {
+    local exit_code="$1"
+    local message="$2"
+    if [[ "${exit_code}" -ne 0 ]]; then
+        echo "${script_name}: ${message}" >&2
+        exit "${exit_code}"
+    fi
+}
+
+create_mail_file () {
+    mail_file=$(mktemp -t presenter_data_transfer.XXXXXXX)
+    if [[ $? -ne 0 ]]; then
+        echo "Unable to create temporary mail file" >&2
+        exit 1
+    fi
+}
+
+generate_live_data_file () {
+    data_file=$(mktemp -t presenter_data_live.XXXXXXX)
+    exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
+
+    dbaccess "${database}" - >/dev/null 2>&1 <<EOF
+set isolation dirty read;
+UNLOAD TO "${data_file}" DELIMITER ">"
+SELECT pres_id, pres_auth_code, pres_e_mail_in, pres_name
+FROM PRESENTER
+WHERE pres_start_dt > datetime (${presenter_start_date_time}) year to minute
+AND pres_start_dt <= datetime (${presenter_end_date_time}) year to minute
+AND pres_id !='88888888000'
+AND pres_id not matches '6666*'
+ORDER BY pres_start_dt;
+EOF
+
+    exit_on_error "$?" "dbaccess returned $? (${FUNCNAME[0]}:${LINENO})"
+}
+
+
+generate_test_data_file () {
+    data_file=$(mktemp -t presenter_data_test.XXXXXXX)
+    exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
+
+    dbaccess "${database}" - >/dev/null 2>&1 <<EOF
+set isolation dirty read;
+UNLOAD TO '${data_file}' DELIMITER '>'
+SELECT pres_id, pres_auth_code, pres_e_mail_in, pres_name
+FROM PRESENTER
+WHERE pres_start_dt = TODAY
+AND pres_id matches '6666*'
+ORDER BY pres_start_dt;
+EOF
+
+    exit_on_error "$?" "dbaccess returned $? (${FUNCNAME[0]}:${LINENO})"
+}
+
+transfer_live_data_file () {
+    aws s3 cp "${data_file}" "s3://${live_presenter_data_bucket}/live/live-presenter-data-${today}"
+    exit_on_error "$?" "file transfer failed with exit code $? (${FUNCNAME[0]}:${LINENO})"
+}
+
+transfer_test_data_file () {
+    aws s3 cp "${data_file}" "s3://${test_presenter_data_bucket}/test/test-presenter-data-${today}"
+    exit_on_error "$?" "file transfer failed with exit code $? (${FUNCNAME[0]}:${LINENO})"
+}
+
+delete_mail_file () {
+    rm -f "${mail_file}"
+}
+
+delete_data_file () {
+    rm -f "${data_file}"
+}
+
+# -- Stats --------------------------------------------------------------------
+
+email_data_file () {
+{% if alerts.enabled %}
+    mailx -a "${data_file} "-s "INFO - PRESENTER TRANSFER ${today}" {% for recipient in alerts_config.presenter_data_transfer %}{{ recipient }} {% endfor %}< "${mail_file}"
+{% else %}
+    echo "Alerts disabled; no mail message(s) will be generated"
+{% endif %}
+}
+
+# -- Entrypoint ---------------------------------------------------------------
+
+main () {
+    check_user
+    create_mail_file
+
+    if [[ "${transfer_mode}" == "TEST" ]]; then
+        generate_test_data_file
+        transfer_test_data_file
+    elif [[ "${transfer_mode}" == "LIVE" ]]; then
+        generate_live_data_file
+        transfer_live_data_file
+    else
+        echo "Mode of operation cannot be determined; environment variable WEB_PRES_TRANS_MODE is not set" >&2
+        exit 1
+    fi
+
+    email_data_file
+
+    delete_data_file
+    delete_mail_file
+}
+
+main "${@}"
