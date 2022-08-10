@@ -1,8 +1,6 @@
 #!/bin/bash
 
-# TODO document
-
-# Copy presenter data to S3 bucket for retreival and processing on backend XML
+# Copy presenter data to S3 bucket for retrieval and processing by backend XML
 # service instances.
 
 source "{{ informix_install_path }}/etc/informix.env.${USER}"
@@ -17,9 +15,9 @@ today=$(date '+%Y-%m-%d')
 yesterday=$(date --date="${today} -1 day")
 presenter_start_date_time=$(date --date="${yesterday}" +'%Y-%m-%d 00:00')
 presenter_end_date_time=$(date --date="${yesterday}" +'%Y-%m-%d 23:59')
-transfer_mode="${WEB_PRES_TRANS_MODE}"
-live_presenter_data_bucket="{{ presenter_data_bucket_name }}"
-test_presenter_data_bucket="{{ presenter_data_bucket_name }}"
+transfer_mode="$(tr '[:upper:]' '[:lower:]' <<< "${WEB_PRES_TRANS_MODE}")"
+presenter_data_bucket="{{ presenter_data_bucket_name }}"
+presenter_data_kms_key_id="{{ presenter_data_kms_key_id }}"
 
 # -- General ------------------------------------------------------------------
 
@@ -66,7 +64,6 @@ EOF
     exit_on_error "$?" "dbaccess returned $? (${FUNCNAME[0]}:${LINENO})"
 }
 
-
 generate_test_data_file () {
     data_file=$(mktemp -t presenter_data_test.XXXXXXX)
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
@@ -84,14 +81,22 @@ EOF
     exit_on_error "$?" "dbaccess returned $? (${FUNCNAME[0]}:${LINENO})"
 }
 
-transfer_live_data_file () {
-    aws s3 cp "${data_file}" "s3://${live_presenter_data_bucket}/live/live-presenter-data-${today}"
+transfer_data_file () {
+    aws s3 cp --sse aws:kms --sse-kms-key-id "${presenter_data_kms_key_id}" "${data_file}" "s3://${presenter_data_bucket}/${transfer_mode}-presenter-data-${today}"
     exit_on_error "$?" "file transfer failed with exit code $? (${FUNCNAME[0]}:${LINENO})"
 }
 
-transfer_test_data_file () {
-    aws s3 cp "${data_file}" "s3://${test_presenter_data_bucket}/test/test-presenter-data-${today}"
-    exit_on_error "$?" "file transfer failed with exit code $? (${FUNCNAME[0]}:${LINENO})"
+check_transfer_mode () {
+    if [[ "${transfer_mode}" == "test" ]]; then
+        generate_test_data_file
+        transfer_data_file
+    elif [[ "${transfer_mode}" == "live" ]]; then
+        generate_live_data_file
+        transfer_data_file
+    else
+        echo "Mode of operation cannot be determined; environment variable WEB_PRES_TRANS_MODE is not set" >&2
+        exit 1
+    fi
 }
 
 delete_mail_file () {
@@ -116,19 +121,9 @@ email_data_file () {
 
 main () {
     check_user
+    check_transfer_mode
+
     create_mail_file
-
-    if [[ "${transfer_mode}" == "TEST" ]]; then
-        generate_test_data_file
-        transfer_test_data_file
-    elif [[ "${transfer_mode}" == "LIVE" ]]; then
-        generate_live_data_file
-        transfer_live_data_file
-    else
-        echo "Mode of operation cannot be determined; environment variable WEB_PRES_TRANS_MODE is not set" >&2
-        exit 1
-    fi
-
     email_data_file
 
     delete_data_file
