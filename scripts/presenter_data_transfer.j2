@@ -16,8 +16,14 @@ yesterday=$(date --date="${today} -1 day")
 presenter_start_date_time=$(date --date="${yesterday}" +'%Y-%m-%d 00:00')
 presenter_end_date_time=$(date --date="${yesterday}" +'%Y-%m-%d 23:59')
 transfer_mode="$(tr '[:upper:]' '[:lower:]' <<< "${WEB_PRES_TRANS_MODE}")"
-presenter_data_bucket="{{ presenter_data_bucket_name }}"
-presenter_data_kms_key_id="{{ presenter_data_kms_key_id }}"
+{% if ef_presenter_data.enabled %}
+presenter_data_bucket="{{ ef_presenter_config.s3_bucket_name }}"
+presenter_data_kms_key_id="{{ ef_presenter_config.kms_key_id }}"
+{% else %}
+presenter_data_bucket="dummy-ef-presenter-bucket-name"
+presenter_data_kms_key_id="dummy-ef-presenter-kms-key-id"
+{% endif %}
+
 
 # -- General ------------------------------------------------------------------
 
