@@ -68,7 +68,7 @@ main () {
     check_user
     check_orders
 
-    if [[ "${#order_numbers_with_error[@]}" -gt 0 ]]; then
+    if [[ -n "${order_numbers_with_error[*]}" ]]; then
         send_alerts
     fi
 }
