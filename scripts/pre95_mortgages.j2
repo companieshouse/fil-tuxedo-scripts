@@ -48,7 +48,7 @@ create_data_file () {
 }
 
 unload_db_rows () {
-    dbaccess "${database}" <<EOF >/dev/null 2>&1
+    dbaccess "${database}" - >/dev/null 2>&1 <<EOF
 unload to "${unload_file}"
 select company_number from orders
 where ( order_date_out = (today - 1) or order_date = (today - 1) )  and
