@@ -84,22 +84,17 @@ EOF
 }
 
 transfer_data_file () {
-    if [[ -z "${date_suffix}" ]]; then
-        echo "No date suffix specified for S3 object; data file not copied"
-        exit 1
-    fi
-
-    aws s3 cp --sse aws:kms --sse-kms-key-id "${presenter_data_kms_key_id}" "${data_file}" "s3://${presenter_data_bucket}/${transfer_mode}-presenter-data-${date_suffix}"
+    aws s3 cp --sse aws:kms --sse-kms-key-id "${presenter_data_kms_key_id}" "${data_file}" "s3://${presenter_data_bucket}/${transfer_mode}-presenter-data-${data_date}"
     exit_on_error "$?" "file transfer failed with exit code $? (${FUNCNAME[0]}:${LINENO})"
 }
 
 generate_data_file () {
     if [[ "${transfer_mode}" == "test" ]]; then
-        date_suffix="${today}"
+        data_date="${today}"
         generate_test_data_file
         transfer_data_file
     elif [[ "${transfer_mode}" == "live" ]]; then
-        date_suffix="${yesterday}"
+        data_date="${yesterday}"
         generate_live_data_file
         transfer_data_file
     else
@@ -120,10 +115,10 @@ delete_data_file () {
 
 email_data_file () {
 {% if alerts.enabled %}
-    local temp_file="${transfer_mode}-presenter-data-${date_suffix}"
+    local temp_file="${transfer_mode}-presenter-data-${data_date}"
     pushd /tmp >/dev/null
     cp -f "${data_file}" "${temp_file}"
-    mailx -a "${temp_file}" -s "INFO - PRESENTER TRANSFER ${today}" {% for recipient in alerts_config.presenter_data_transfer %}{{ recipient }} {% endfor %}< "${mail_file}"
+    mailx -a "${temp_file}" -s "INFO - PRESENTER TRANSFER ${data_date}" {% for recipient in alerts_config.presenter_data_transfer %}{{ recipient }} {% endfor %}< "${mail_file}"
     rm -f "${temp_file}"
     popd >/dev/null
 {% else %}
