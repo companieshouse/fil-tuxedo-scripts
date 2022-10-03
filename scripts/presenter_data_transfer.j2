@@ -5,6 +5,8 @@
 
 source "{{ informix_install_path }}/etc/informix.env.${USER}"
 
+PATH=$PATH:/usr/local/bin
+
 # -- Internal variables -------------------------------------------------------
 
 script_name=$(basename "$0")
