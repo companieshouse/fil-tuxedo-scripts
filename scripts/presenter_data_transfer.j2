@@ -88,6 +88,7 @@ EOF
 transfer_data_file () {
     aws s3 cp --sse aws:kms --sse-kms-key-id "${presenter_data_kms_key_id}" "${data_file}" "s3://${presenter_data_bucket}/${transfer_mode}-presenter-data-${data_date}"
     exit_on_error "$?" "file transfer failed with exit code $? (${FUNCNAME[0]}:${LINENO})"
+    echo "The attached data file for ${data_date} has been uploaded to the S3 bucket ${presenter_data_bucket}" >> "${mail_file}"
 }
 
 generate_data_file () {
