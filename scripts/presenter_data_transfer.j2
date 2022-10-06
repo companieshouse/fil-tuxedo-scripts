@@ -5,6 +5,8 @@
 
 source "{{ informix_install_path }}/etc/informix.env.${USER}"
 
+PATH=$PATH:/usr/local/bin
+
 # -- Internal variables -------------------------------------------------------
 
 script_name=$(basename "$0")
@@ -12,9 +14,7 @@ script_name=$(basename "$0")
 database="ef_db"
 
 today=$(date '+%Y-%m-%d')
-yesterday=$(date --date="${today} -1 day")
-presenter_start_date_time=$(date --date="${yesterday}" +'%Y-%m-%d 00:00')
-presenter_end_date_time=$(date --date="${yesterday}" +'%Y-%m-%d 23:59')
+yesterday=$(date --date="${today} -1 day" '+%Y-%m-%d')
 transfer_mode="$(tr '[:upper:]' '[:lower:]' <<< "${WEB_PRES_TRANS_MODE}")"
 {% if ef_presenter_data.enabled %}
 presenter_data_bucket="{{ ef_presenter_config.s3_bucket_name }}"
@@ -23,7 +23,6 @@ presenter_data_kms_key_id="{{ ef_presenter_config.kms_key_id }}"
 presenter_data_bucket="dummy-ef-presenter-bucket-name"
 presenter_data_kms_key_id="dummy-ef-presenter-kms-key-id"
 {% endif %}
-
 
 # -- General ------------------------------------------------------------------
 
@@ -60,8 +59,7 @@ set isolation dirty read;
 UNLOAD TO "${data_file}" DELIMITER ">"
 SELECT pres_id, pres_auth_code, pres_e_mail_in, pres_name
 FROM PRESENTER
-WHERE pres_start_dt > datetime (${presenter_start_date_time}) year to minute
-AND pres_start_dt <= datetime (${presenter_end_date_time}) year to minute
+WHERE pres_start_dt = (TODAY - 1)
 AND pres_id !='88888888000'
 AND pres_id not matches '6666*'
 ORDER BY pres_start_dt;
@@ -88,15 +86,18 @@ EOF
 }
 
 transfer_data_file () {
-    aws s3 cp --sse aws:kms --sse-kms-key-id "${presenter_data_kms_key_id}" "${data_file}" "s3://${presenter_data_bucket}/${transfer_mode}-presenter-data-${today}"
+    aws s3 cp --sse aws:kms --sse-kms-key-id "${presenter_data_kms_key_id}" "${data_file}" "s3://${presenter_data_bucket}/${transfer_mode}-presenter-data-${data_date}"
     exit_on_error "$?" "file transfer failed with exit code $? (${FUNCNAME[0]}:${LINENO})"
+    echo "The attached data file for ${data_date} has been uploaded to the S3 bucket ${presenter_data_bucket}" >> "${mail_file}"
 }
 
-check_transfer_mode () {
+generate_data_file () {
     if [[ "${transfer_mode}" == "test" ]]; then
+        data_date="${today}"
         generate_test_data_file
         transfer_data_file
     elif [[ "${transfer_mode}" == "live" ]]; then
+        data_date="${yesterday}"
         generate_live_data_file
         transfer_data_file
     else
@@ -117,7 +118,12 @@ delete_data_file () {
 
 email_data_file () {
 {% if alerts.enabled %}
-    mailx -a "${data_file} "-s "INFO - PRESENTER TRANSFER ${today}" {% for recipient in alerts_config.presenter_data_transfer %}{{ recipient }} {% endfor %}< "${mail_file}"
+    local temp_file="${transfer_mode}-presenter-data-${data_date}"
+    pushd /tmp >/dev/null
+    cp -f "${data_file}" "${temp_file}"
+    mailx -a "${temp_file}" -s "INFO - PRESENTER TRANSFER ${data_date}" {% for recipient in alerts_config.presenter_data_transfer %}{{ recipient }} {% endfor %}< "${mail_file}"
+    rm -f "${temp_file}"
+    popd >/dev/null
 {% else %}
     echo "Alerts disabled; no mail message(s) will be generated"
 {% endif %}
@@ -127,9 +133,9 @@ email_data_file () {
 
 main () {
     check_user
-    check_transfer_mode
-
     create_mail_file
+
+    generate_data_file
     email_data_file
 
     delete_data_file
