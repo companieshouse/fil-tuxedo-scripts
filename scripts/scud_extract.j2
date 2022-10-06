@@ -1,0 +1,401 @@
+#!/bin/bash
+
+# Generate scud extract files containing details of the scanned documents for
+# the day, export TIFF images, and update database with amended day numbers.
+
+source "{{ informix_install_path }}/etc/informix.env.${USER}"
+
+# -- Internal variables -------------------------------------------------------
+
+script_name=$(basename "$0")
+
+database="scud"
+date_suffix=$(date +%d%m%Y)
+
+scan_dir="/scanning"
+app_dir="${HOME}/deployment/appdir"
+config_dir="${HOME}/deployment/config"
+
+extract_dir="${HOME}/extract"
+extract_file="${extract_dir}/extractfile"
+
+import_dir="${scan_dir}/trig1"
+ftf_dir="${scan_dir}/ftf"
+
+import_extract_file="${import_dir}/extractfile"
+import_extract_file_backup_dir="${import_dir}/oldfiles"
+import_amended_extract_file="${import_dir}/extractfilenew"
+import_amended_document_id_file="${import_dir}/changeddocids"
+import_sms_sql_file="${import_dir}/sms.sql"
+import_rms_sql_file="${import_dir}/rms.sql"
+import_header_file="${import_dir}/header"
+
+ftf_extract_file="${ftf_dir}/extractfile"
+
+tiff_export_dir="${scan_dir}/tiffexport"
+tiff_archive_dir="${tiff_export_dir}/oldtif"
+
+document_types=(acc 363 288 287 mort newc cap liq con misc)
+
+log_file="/var/log/tuxedo/${USER}/scud_extract.log"
+
+# -- General ------------------------------------------------------------------
+
+log () {
+    local message="$1"
+    tee -a "${log_file}" <<< "$(date --iso-8601=seconds) ${message}"
+}
+
+check_user () {
+    if [[ "${USER}" == "root" ]]; then
+        echo "${script_name}: This script should be executed as a Tuxedo service user not root" >&2
+        exit 1
+    fi
+}
+
+exit_on_error () {
+    local exit_code="$1"
+    local message="$2"
+    if [[ "${exit_code}" -ne 0 ]]; then
+        log "${message}"
+        exit "${exit_code}"
+    fi
+}
+
+delete_extract_file () {
+    log "Deleting extract file '${ftf_extract_file}'"
+    rm -f "${ftf_extract_file}" 2>/dev/null
+}
+
+create_extract_file () {
+    log "Starting extract file creation process"
+
+    if [[ ! -d "${extract_dir}" ]]; then
+        mkdir "${extract_dir}"
+        chmod 0700 "${extract_dir}"
+    fi
+
+    source "${config_dir}/envfile" && "${app_dir}/extract"
+
+    cp "${extract_file}" "${import_extract_file}"
+    cp "${extract_file}" "${ftf_extract_file}"
+
+    log "Finished extract file creation process"
+}
+
+export_tiff_images_for_directory () {
+    local parent_dir="$1"
+    local tiff_subdir="$2"
+
+    pushd "${parent_dir}" >/dev/null
+
+    while read -r -d $'\0' tiff_image; do
+        log "Exporting TIFF '${parent_dir}/${tiff_image}' to '${tiff_export_dir}/${tiff_image}'"
+        echo "${tiff_image}" | cpio --quiet -pdum "${tiff_export_dir}" >/dev/null
+
+        if [[ ! -f "${tiff_export_dir}/${tiff_image}" ]]; then
+            log "TIFF export failed for file '${parent_dir}/${tiff_image}'"
+        fi
+    done < <(find "${tiff_subdir}" \
+        -name '[0-9]*F' \
+        -follow \
+        -print0)
+
+    popd >/dev/null
+}
+
+export_tiff_images () {
+    log "Starting TIFF image export process"
+
+    pushd "${scan_dir}" >/dev/null
+
+    if [[ ! -f "${extract_file}" ]]; then
+        log "Skipping TIFF image export process; extract file not found: '${extract_file}'"
+        return 0
+    elif [[ ! -s "${extract_file}" ]]; then
+        log "Skipping TIFF image export process; extract file is empty: '${extract_file}'"
+        return 0
+    fi
+
+    while read -r line; do
+        local tiff_dir=$(awk '{ \
+            company_number=substr($0,1,8); \
+            document_id=substr($0,19,11); \
+            print company_number"/"document_id \
+        }' <<< "${line}")
+
+        if [[ ! -d "${tiff_dir}" ]]; then
+            log "No such directory '${PWD}/${tiff_dir}'; unable to export TIFF images"
+            continue
+        fi
+
+        export_tiff_images_for_directory "${scan_dir}" "${tiff_dir}"
+
+    done < "${extract_file}"
+
+    popd >/dev/null
+
+    log "Finished TIFF image export process"
+}
+
+set_company_tiff_dirs () {
+    company_tiff_dirs=()
+    while read -r -d $'\0' company_tiff_dif; do
+        company_tiff_dirs+=("${company_tiff_dif}")
+    done < <(find "${tiff_export_dir}" \
+        -mindepth 1 \
+        -maxdepth 1 \
+        -type d \
+        \( -path "${tiff_archive_dir}" -prune \
+        -o -print0 \))
+}
+
+archive_document_dirs () {
+    local company_tiff_dir="$1"
+    local company_number=$(basename "${company_tiff_dir}")
+
+    while read -r -d $'\0' document_id_dir; do
+        local document_id=$(basename "${document_id_dir}")
+
+        if [[ ! -d "${tiff_archive_dir}/${company_number}" ]]; then
+            log "Creating archival directory for company at '${tiff_archive_dir}/${company_number}'"
+            mkdir "${tiff_archive_dir}/${company_number}"
+        fi
+
+        log "Archiving directory '${document_id_dir}' to '${tiff_archive_dir}/${company_number}/${document_id}'"
+        mv "${document_id_dir}" "${tiff_archive_dir}/${company_number}/${document_id}"
+    done < <(find "${company_tiff_dir}" \
+        -mindepth 1 \
+        -maxdepth 1 \
+        -type d \
+        -mtime +0 \
+        -print0)
+}
+
+archive_tiff_dirs () {
+    log "Starting TIFF archival process"
+
+    set_company_tiff_dirs
+
+    for company_tiff_dir in "${company_tiff_dirs[@]}"; do
+        log "Evaluating subdirectories of '${company_tiff_dir}' for archival"
+        archive_document_dirs "${company_tiff_dir}"
+    done
+
+    log "Finished TIFF archival process"
+}
+
+set_import_day_number () {
+    local temp_file; temp_file=$(mktemp -t scud_extract_day_number.XXXXXXX)
+    exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
+
+    dbaccess "${database}" - >/dev/null 2>&1 <<EOF
+UNLOAD TO "${temp_file}"
+DELIMITER " "
+SELECT day_no
+FROM day
+WHERE id=0;
+EOF
+
+    day_number=$(head -1 "${temp_file}" 2>/dev/null)
+    if [[ -z "${day_number}" ]]; then
+        log "Unable to determine day number from database record"
+        exit 1
+    fi
+
+    day_number=$(printf "%03d" "$((day_number))" 2>/dev/null)
+    exit_on_error "$?" "Unable to convert day number to numeric value or pad with leading zeros (${FUNCNAME[0]}:${LINENO})"
+
+    log "Creating day number file at: '${import_dir}/D${day_number}'"
+    touch "${import_dir}/D${day_number}"
+
+    rm -f "${temp_file}"
+    exit_on_error "$?" "Unable to remove temporary file (${FUNCNAME[0]}:${LINENO})"
+}
+
+cleanup_import_files () {
+    log "Starting SCUD import files cleanup"
+
+    pushd "${import_dir}" >/dev/null
+
+    for document_type in "${document_types[@]}"; do
+        rm -f "extract.${document_type}" 2>/dev/null
+    done
+
+    rm -f -- D* ind_* *part* "${import_header_file}" 2>/dev/null
+
+    popd >/dev/null
+
+    log "Finished SCUD import files cleanup"
+}
+
+create_amended_extract_file () {
+    log "Creating extract file with amended day numbers at '${import_amended_extract_file}'"
+
+    awk -v day_number="${day_number}" '{ \
+        company_number_and_doc_id=substr($0,1,30); \
+        reg_date_and_page_count=substr($0,34,49); \
+        print company_number_and_doc_id day_number reg_date_and_page_count; \
+    }' \
+    < "${import_extract_file}" \
+    > "${import_amended_extract_file}"
+
+    if [[ ! -f "${import_amended_extract_file}" || ! -s "${import_amended_extract_file}" ]]; then
+        log "Failed to create extract file with amended day numbers at '${import_amended_extract_file}'"
+        exit 1
+    fi
+
+    log "Finished creating extract file with amended day numbers"
+}
+
+create_amended_document_id_file () {
+    log "Creating document ID file with amended day numbers at '${import_amended_document_id_file}'"
+
+    awk -v day_number="${day_number}" '{ \
+        document_id=substr($0,19,12); \
+        original_day_number=substr($0,31,3); \
+        print document_id original_day_number, document_id day_number; \
+    }' \
+    < "${import_extract_file}" \
+    > "${import_amended_document_id_file}"
+
+    if [[ ! -f "${import_amended_document_id_file}" || ! -s "${import_amended_document_id_file}" ]]; then
+        log "Failed to create document ID file with amended day numbers at '${import_amended_document_id_file}'"
+        exit 1
+    fi
+
+    log "Finished creating document ID file with amended day numbers at '${import_amended_document_id_file}'"
+}
+
+create_sql_files () {
+    log "Creating SMS SQL file at '${import_sms_sql_file}'"
+
+    awk '{ \
+        print "update orders set document_id=\"" $2 "\" where document_id=\""$1 "\";" \
+    }' \
+    < "${import_amended_document_id_file}" \
+    > "${import_sms_sql_file}"
+
+    log "Creating RMS SQL file at '${import_rms_sql_file}'"
+    awk '{ \
+        print "update orders set doc_sort_no=\"" substr($2,13,3) "\" where company_no=\"" substr($1,4,8) "\" and doc_barcode=\""substr($1,1,11) "\";" \
+    }' \
+    < "${import_amended_document_id_file}" \
+    > "${import_rms_sql_file}"
+}
+
+create_document_category_files () {
+    log "Creating document category files in '${PWD}'"
+    awk '{ \
+        if (substr($0,9,2) == "AA") print > "extract.misc"
+        else if (substr($0,9,3) == "363") print > "extract.misc"
+        else if (substr($0,9,3) == "288") print > "extract.misc"
+        else if (substr($0,9,3) == "287") print > "extract.misc"
+        else if (substr($0,9,6) == "NEWINC") print > "extract.misc"
+        else if (substr($0,9,2) == "88") print > "extract.misc"
+        else if (substr($0,9,3) == "600") print > "extract.misc"
+        else if (substr($0,9,6) == "CERTNM") print > "extract.misc"
+        else print > "extract.misc" \
+    }' \
+    < "${import_amended_extract_file}"
+}
+
+create_part_and_indicator_files () {
+    log "Starting part and indicator files creation process"
+
+    for document_type in "${document_types[@]}"; do
+        if [[ -s "extract.${document_type}" ]]; then
+            echo "${document_type}" > "ind_${document_type}"
+            echo "-C /apps/scud/trig1 ind_${document_type}" > "${document_type}_parta"
+
+            awk '{ \
+                print "-C /image/scud/" substr($0,1,8) " " substr($0,19,11)
+            }' \
+            < "extract.${document_type}" \
+            >> "${document_type}_parta"
+
+            awk '{ \
+                print substr($0,19,11) " " substr($0,1,8) " " substr($0,9,9) "  " substr($0,44,3) " 0000000000 N" \
+            }' \
+            < "extract.${document_type}" \
+            >> "ind_${document_type}"
+        fi
+    done
+
+    log "Finished part and indicator files creation process"
+}
+
+create_header_file () {
+    log "Starting header file creation process"
+
+    echo "${day_number}" > "${import_header_file}"
+
+    for document_type in "${document_types[@]}"; do
+        if [[ -s "extract.${document_type}" ]]; then
+            echo -n "${document_type}," >> "${import_header_file}"
+        fi
+    done
+
+    echo -e "\nSection 1 : header" >> "${import_header_file}"
+    local part_count=1;
+    for part in $(ls -- *_parta | awk -F"_" '{print $1}'); do
+        part_count=$((part_count + 1))
+        echo "Section ${part_count} : ${part}_parta" >> "${import_header_file}"
+    done
+
+    log "Finished header file creation process"
+}
+
+create_import_files () {
+    log "Starting SCUD import files creation process"
+
+    if [[ ! -f "${import_extract_file}" ]]; then
+        log "Failed SCUD import file creation process; no such file '${import_extract_file}'"
+        exit 1
+    fi
+
+    pushd "${import_dir}" >/dev/null
+
+    cp "${import_extract_file}" "${import_extract_file_backup_dir}/$(basename ${import_extract_file}).${date_suffix}"
+
+    cleanup_import_files
+    
+    set_import_day_number
+
+    create_amended_extract_file
+    create_amended_document_id_file
+    create_sql_files
+    create_document_category_files
+    create_part_and_indicator_files
+    create_header_file
+
+    log "Deleting SCUD import extract file '${import_extract_file}'"
+    rm -f "${import_extract_file}" 2>/dev/null
+
+    popd >/dev/null
+
+    log "Finished SCUD import files creation process"
+}
+
+update_database_records () {
+    log "Starting database records update process"
+
+    local db_command_output; db_command_output=$(dbaccess "${database}" "${import_sms_sql_file}" 2>&1)
+    exit_on_error "$?" "An error occurred during database records update: ${db_command_output}"
+
+    log "Finished database records update process"
+}
+
+main () {
+    check_user
+
+    archive_tiff_dirs
+    delete_extract_file
+    create_extract_file
+    export_tiff_images
+    create_import_files
+
+    update_database_records
+}
+
+main "${@}"
