@@ -6,8 +6,6 @@ source "{{ informix_install_path }}/etc/informix.env.${USER}"
 
 # -- Internal variables -------------------------------------------------------
 
-script_name=$(basename "$0")
-
 database="scud"
 
 log_file="{{ tuxedo_logs_path }}/${USER}/orders_archive.log"
@@ -55,7 +53,7 @@ archive_orders () {
     log "Starting archive orders load operation"
 
     dbaccess "${database}" - >/dev/null 2>&1 <<EOF
-LOAD FROM "${temp_file}"
+LOAD FROM "${unload_file}"
 INSERT INTO archorders;
 EOF
 
