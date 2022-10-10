@@ -80,9 +80,9 @@ add_scud_search_orders_transmitted_count () {
 
     dbaccess "${database}" - >/dev/null 2>&1 <<EOF
 unload to "${temp_file}"
-select count(*) from orders where order_date > (today - 7) and  
+select count(*) from orders where order_date > (today - 7) and
 order_date <= (today) and
-order_status = "T" 
+order_status = "T"
 and account_number IN ("00910132000","00910134000","00910130000","00910131000","00910135000","00910054000","00910136000");
 EOF
 
