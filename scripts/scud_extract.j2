@@ -21,6 +21,7 @@ extract_file="${extract_dir}/extractfile"
 
 import_dir="${scan_dir}/trig1"
 ftf_dir="${scan_dir}/ftf"
+chips_extract_dir="/home/scud/batenvp1/input/scud_trans"
 
 import_extract_file="${import_dir}/extractfile"
 import_extract_file_backup_dir="${import_dir}/oldfiles"
@@ -77,10 +78,17 @@ create_extract_file () {
 
     source "${config_dir}/envfile" && "${app_dir}/extract"
 
+    log "Finished extract file creation process"
+}
+
+copy_extract_file () {
+    log "Starting extract file copy process"
+
     cp "${extract_file}" "${import_extract_file}"
     cp "${extract_file}" "${ftf_extract_file}"
+    cp "${extract_file}" "${chips_extract_dir}/scud_trans.$(date +%Y%m%d%H%M%S)"
 
-    log "Finished extract file creation process"
+    log "Finished extract file copy process"
 }
 
 export_tiff_images_for_directory () {
@@ -392,6 +400,7 @@ main () {
     archive_tiff_dirs
     delete_extract_file
     create_extract_file
+    copy_extract_file
     export_tiff_images
     create_import_files
 

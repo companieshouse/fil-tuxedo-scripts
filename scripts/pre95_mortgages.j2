@@ -10,7 +10,8 @@ script_name=$(basename "$0")
 
 database="scud"
 date_suffix=$(date +%d%m%Y)
-scan_dir=/data1/home/scanning
+scan_dir="/scanning"
+chips_pre95_dir="/home/scud/batenvp1/input/scud_pre95"
 
 # -- General ------------------------------------------------------------------
 
@@ -59,6 +60,7 @@ EOF
 copy_data_file () {
     cp "${data_file}" "${scan_dir}/ftf/PRE95M"
     cp "${data_file}" "${scan_dir}/trig1/oldfiles/PRE95M.${date_suffix}"
+    cp "${data_file}" "${chips_pre95_dir}/scud_pre95.$(date +%Y%m%d%H%M%S)"
 }
 
 populate_mail_file () {
@@ -96,6 +98,7 @@ main () {
     create_unload_file
     unload_db_rows
     create_data_file
+    copy_data_file
     populate_mail_file
 
     if [[ ! -f ${scan_dir}/ftf/PRE95M ]]; then
