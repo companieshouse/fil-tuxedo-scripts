@@ -5,6 +5,7 @@
 # -- Internal variables -------------------------------------------------------
 
 script_name=$(basename "$0")
+file_max_age_days="7"
 
 # -- General ------------------------------------------------------------------
 
@@ -20,8 +21,8 @@ delete_image_metadata_files () {
         echo "${script_name}: Mandatory environment variable TXT_DIR not set" >&2
         exit 1
     else
-        echo "Deleting image metadata files"
-        find "${TXT_DIR}" -maxdepth 1 -type f -delete -print
+        echo "${script_name}: Deleting image metadata files older than ${file_max_age_days} days"
+        find "${TXT_DIR}" -maxdepth 1 -type f -mtime +"${file_max_age_days}" -delete -print
     fi
 }
 
