@@ -45,6 +45,7 @@ unload_orders () {
 UNLOAD TO "${unload_file}"
 SELECT * FROM orders WHERE order_date < (today - 7);
 EOF
+    exit_on_error "$?" "dbaccess returned $? (${FUNCNAME[0]}:${LINENO})"
 
     log "Finished orders unload operation"
 }
@@ -56,6 +57,7 @@ archive_orders () {
 LOAD FROM "${unload_file}"
 INSERT INTO archorders;
 EOF
+    exit_on_error "$?" "dbaccess returned $? (${FUNCNAME[0]}:${LINENO})"
 
     log "Finished archive orders load operation"
 }
