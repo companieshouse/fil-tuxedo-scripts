@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Check ULOG for SQLSTATE errors indicating database lock and send alerts by email.
+# Check ULOG for SQLSTATE exception errors and send alerts by email.
 
 source "{{ informix_install_path }}/etc/informix.env.${USER}"
 
@@ -27,11 +27,11 @@ create_mail_file () {
     fi
 }
 
-check_network_errors () {
-    local network_errors=$(tail -10 "${ulog}" | grep "Could not insert new row" | wc -l)
+check_errors () {
+    local errors=$(tail -3 "${ulog}" | grep "Exception raised" | wc -l)
 
-    if [[ "${network_errors}" -gt 1 ]]; then
-        append_mail_file "ULOG showing SQLSTATE errors ('Could not insert new row'). Please Investigate.\n"
+    if [[ "${errors}" -gt 1 ]]; then
+        append_mail_file "ULOG showing SQLSTATE errors ('Exception raised'). Action is required to resend these from frontend services.\n"
     fi
 }
 
@@ -48,7 +48,7 @@ delete_mail_file () {
 
 send_alert () {
 {% if alerts.enabled %}
-    mailx -r "${USER}@$(hostname)" -s "WARNING - $(tr '[:lower:]' '[:upper:]' <<< "${USER}") database lock failure - ULOG PROBLEM" {% for recipient in alerts_config.database_lock_check %}{{ recipient }} {% endfor %}< "${mail_file}"
+    mailx -r "${USER}@$(hostname)" -s "WARNING - $(tr '[:lower:]' '[:upper:]' <<< "${USER}") SQLSTATE errors - ULOG PROBLEM" {% for recipient in alerts_config.database_lock_check %}{{ recipient }} {% endfor %}< "${mail_file}"
 {% else %}
     echo "Alerts disabled; no mail message(s) will be generated"
 {% endif %}
@@ -60,7 +60,7 @@ main () {
     check_user
     create_mail_file
 
-    check_network_errors
+    check_errors
 
     if [[ -s "${mail_file}" ]]; then
         send_alert
