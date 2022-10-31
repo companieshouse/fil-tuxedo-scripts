@@ -27,10 +27,10 @@ create_mail_file () {
     fi
 }
 
-check_network_errors () {
-    local network_errors=$(tail -10 "${ulog}" | grep "Could not insert new row" | wc -l)
+check_errors () {
+    local errors=$(tail -10 "${ulog}" | grep "Could not insert new row" | wc -l)
 
-    if [[ "${network_errors}" -gt 1 ]]; then
+    if [[ "${errors}" -gt 1 ]]; then
         append_mail_file "ULOG showing SQLSTATE errors ('Could not insert new row'). Please Investigate.\n"
     fi
 }
@@ -60,7 +60,7 @@ main () {
     check_user
     create_mail_file
 
-    check_network_errors
+    check_errors
 
     if [[ -s "${mail_file}" ]]; then
         send_alert
