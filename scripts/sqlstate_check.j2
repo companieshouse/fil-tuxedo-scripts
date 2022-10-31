@@ -9,6 +9,10 @@ source "{{ informix_install_path }}/etc/informix.env.${USER}"
 script_name=$(basename "$0")
 
 ulog="{{ tuxedo_logs_path }}/${USER}/ULOG.$(date +%m%d%y)"
+ulog_log_lines="3"
+
+error_threshold="1"
+error_threshold_exceeded="false"
 
 # -- General ------------------------------------------------------------------
 
@@ -28,10 +32,9 @@ create_mail_file () {
 }
 
 check_errors () {
-    local errors=$(tail -3 "${ulog}" | grep "Exception raised" | wc -l)
-
-    if [[ "${errors}" -gt 1 ]]; then
+    if [[ $(tail -${ulog_log_lines} "${ulog}" | grep -c "Exception raised") -gt ${error_threshold} ]]; then
         append_mail_file "ULOG showing SQLSTATE errors ('Exception raised'). Action is required to resend these from frontend services.\n"
+        error_threshold_exceeded="true"
     fi
 }
 
@@ -62,7 +65,7 @@ main () {
 
     check_errors
 
-    if [[ -s "${mail_file}" ]]; then
+    if [[ "${error_threshold_exceeded}" == "true" ]]; then
         send_alert
     fi
 
