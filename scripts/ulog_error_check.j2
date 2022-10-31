@@ -1,0 +1,75 @@
+#!/bin/bash
+
+# Check ULOG for generic errors and send alerts by email.
+
+source "{{ informix_install_path }}/etc/informix.env.${USER}"
+
+# -- Internal variables -------------------------------------------------------
+
+script_name=$(basename "$0")
+
+ulog="{{ tuxedo_logs_path }}/${USER}/ULOG.$(date +%m%d%y)"
+ulog_log_lines="8"
+
+error_threshold="3"
+error_threshold_exceeded="false"
+
+# -- General ------------------------------------------------------------------
+
+check_user () {
+    if [[ "${USER}" == "root" ]]; then
+        echo "${script_name}: This script should be executed as a Tuxedo service user not root" >&2
+        exit 1
+    fi
+}
+
+create_mail_file () {
+    mail_file=$(mktemp -t "${script_name}.XXXXXXX")
+    if [[ $? -ne 0 ]]; then
+        echo "Unable to create temporary mail file" >&2
+        exit 1
+    fi
+}
+
+check_errors () {
+    if [[ $(tail -${ulog_log_lines} "${ulog}" | grep -c "ERROR") -gt ${error_threshold} ]]; then
+        append_mail_file "ULOG showing errors. Please Investigate.\n"
+        error_threshold_exceeded="true"
+    fi
+}
+
+append_mail_file () {
+    local message="$1"
+    echo -e "${message}" >> "${mail_file}"
+}
+
+delete_mail_file () {
+    rm -f "${mail_file}"
+}
+
+# -- Alerts -------------------------------------------------------------------
+
+send_alert () {
+{% if alerts.enabled %}
+    mailx -r "${USER}@$(hostname)" -s "WARNING - $(tr '[:lower:]' '[:upper:]' <<< "${USER}") errors - ULOG PROBLEM" {% for recipient in alerts_config.ulog_error_check %}{{ recipient }} {% endfor %}< "${mail_file}"
+{% else %}
+    echo "Alerts disabled; no mail message(s) will be generated"
+{% endif %}
+}
+
+# -- Entrypoint ---------------------------------------------------------------
+
+main () {
+    check_user
+    create_mail_file
+
+    check_errors
+
+    if [[ "${error_threshold_exceeded}" == "true" ]]; then
+        send_alert
+    fi
+
+    delete_mail_file
+}
+
+main "${@}"
