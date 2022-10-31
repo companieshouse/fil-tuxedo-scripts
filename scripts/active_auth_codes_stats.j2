@@ -59,7 +59,7 @@ EOF
     active_auth_codes_count=$(grep -E '([0-9])' <<< "${active_auth_codes_count}" | awk '{print $1}')
 
     if [[ -z "${active_auth_codes_count}" ]]; then
-        echo "Unable to determine active auth codes count"
+        echo "Unable to determine active auth codes count" >&2
         exit 1
     fi
 
