@@ -59,7 +59,7 @@ send_alert () {
 {% if alerts.enabled %}
     local temp_file="duplicate_auth_codes.txt"
     pushd /tmp >/dev/null
-    cp -f "${data_file}" "${temp_file}"
+    cp -f "${mail_file}" "${temp_file}"
     mailx -a "${temp_file}" -s "WARNING - Duplicate Auth Code File" {% for recipient in alerts_config.duplicate_auth_codes_check %}{{ recipient }} {% endfor %}< "${mail_file}"
     rm -f "${temp_file}"
     popd >/dev/null
