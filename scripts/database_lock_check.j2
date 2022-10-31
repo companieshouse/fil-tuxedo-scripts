@@ -31,7 +31,7 @@ check_network_errors () {
     local network_errors=$(tail -10 "${ulog}" | grep "Could not insert new row" | wc -l)
 
     if [[ "${network_errors}" -gt 1 ]]; then
-        append_mail_file "ULOG showing SQLSTATE errors. Please Invvestigate.\n"
+        append_mail_file "ULOG showing row insert failures. Please Investigate.\n"
     fi
 }
 
