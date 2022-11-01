@@ -1,0 +1,47 @@
+#!/bin/bash
+
+# Clear old entries from the auth change Informix database table.
+
+source "{{ informix_install_path }}/etc/informix.env.${USER}"
+
+# -- Internal variables -------------------------------------------------------
+
+script_name=$(basename "$0")
+
+database="ef_db"
+
+# -- General ------------------------------------------------------------------
+
+check_user () {
+    if [[ "${USER}" == "root" ]]; then
+        echo "${script_name}: This script should be executed as a Tuxedo service user not root" >&2
+        exit 1
+    fi
+}
+
+exit_on_error () {
+    local exit_code="$1"
+    local message="$2"
+    if [[ "${exit_code}" -ne 0 ]]; then
+        echo "Error: ${message}"
+        exit "${exit_code}"
+    fi
+}
+
+clear_auth_change_table () {
+    dbaccess "${database}" - >/dev/null 2>&1 <<EOF
+delete from auth_change
+where status = 'D'
+and start_date < today - 30
+EOF
+    exit_on_error "$?" "dbaccess returned $? (${FUNCNAME[0]}:${LINENO})"
+}
+
+# -- Entrypoint ---------------------------------------------------------------
+
+main () {
+    check_user
+    clear_auth_change_table
+}
+
+main "${@}"
