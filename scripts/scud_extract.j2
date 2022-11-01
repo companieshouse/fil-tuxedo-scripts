@@ -38,7 +38,7 @@ tiff_archive_dir="${tiff_export_dir}/oldtif"
 
 document_types=(acc 363 288 287 mort newc cap liq con misc)
 
-log_file="/var/log/tuxedo/${USER}/scud_extract.log"
+log_file="{{ tuxedo_logs_path }}/${USER}/${script_name}.log"
 
 # -- General ------------------------------------------------------------------
 
@@ -49,7 +49,7 @@ log () {
 
 check_user () {
     if [[ "${USER}" == "root" ]]; then
-        echo "${script_name}: This script should be executed as a Tuxedo service user not root" >&2
+        log "${script_name}: This script should be executed as a Tuxedo service user not root"
         exit 1
     fi
 }
@@ -148,8 +148,8 @@ export_tiff_images () {
 
 set_company_tiff_dirs () {
     company_tiff_dirs=()
-    while read -r -d $'\0' company_tiff_dif; do
-        company_tiff_dirs+=("${company_tiff_dif}")
+    while read -r -d $'\0' company_tiff_dir; do
+        company_tiff_dirs+=("${company_tiff_dir}")
     done < <(find "${tiff_export_dir}" \
         -mindepth 1 \
         -maxdepth 1 \
