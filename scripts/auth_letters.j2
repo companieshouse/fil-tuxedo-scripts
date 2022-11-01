@@ -10,7 +10,9 @@ script_name=$(basename "$0")
 
 app_dir="${HOME}/deployment/appdir"
 
-database="ef"
+database="ef_db"
+
+log_file="{{ tuxedo_logs_path }}/${USER}/${script_name}.log"
 
 # -- General ------------------------------------------------------------------
 
@@ -27,7 +29,7 @@ check_user () {
 }
 
 create_mail_file () {
-    mail_file=$(mktemp -t ${script_name}.XXXXXXX)
+    mail_file=$(mktemp -t "${script_name}.XXXXXXX")
     if [[ $? -ne 0 ]]; then
         echo "Unable to create temporary mail file" >&2
         exit 1
