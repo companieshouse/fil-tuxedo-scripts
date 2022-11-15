@@ -54,13 +54,36 @@ check_user () {
     fi
 }
 
-check_input_files () {
+set_input_files () {
     input_files=( $(ls ${chips_auth_shuttle_output_dir}) )
     if [[ "${#input_files[@]}" -eq 0 ]]; then
         error "There are no input files to process, exiting"
         exit 1
     fi
     trace "${FUNCNAME[0]}:${LINENO} input_files=(${input_files[*]})"
+}
+
+check_shuttle_dirs () {
+    local shuttle_dir_vars=(
+        "chips_auth_shuttle_input_dir"
+        "chips_auth_shuttle_output_dir"
+    )
+
+    local errors="false"
+
+    for shuttle_dir_var in "${shuttle_dir_vars[@]}"; do
+        if [[ -z "${!shuttle_dir_var}" ]]; then
+            error "Script variable '${shuttle_dir_var}' is not set"
+            errors="true"
+        elif [[ ! -d "${!shuttle_dir_var}" ]]; then
+            error "Script variable '${shuttle_dir_var}' references the path '${!shuttle_dir_var}' which does not exist"
+            errors="true"
+        fi
+    done
+
+    if [[ "${errors}" == "true" ]]; then
+        exit 1
+    fi
 }
 
 exit_on_error () {
@@ -403,7 +426,8 @@ main () {
     initialise_logging
 
     check_user
-    check_input_files
+    check_shuttle_dirs
+    set_input_files
 
     create_dir_if_not_exists "${output_file_dir}"
     create_dir_if_not_exists "${archive_file_dir}"
