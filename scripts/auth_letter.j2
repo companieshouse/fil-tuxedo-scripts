@@ -15,8 +15,8 @@ database="ef_db"
 chips_auth_shuttle_input_dir=""
 chips_auth_shuttle_output_dir=""
 
-output_file_dir="${HOME}/eshuttle/done"
-archive_file_dir="${HOME}/eshuttle/archive"
+output_file_dir="${HOME}/dat/eshuttle/complete"
+archive_file_dir="${HOME}/dat/eshuttle/archive"
 
 auth_code_digit_count="5"
 
@@ -302,7 +302,7 @@ disable_auth_codes () {
 
 process_input_file () {
     local input_file_path="$1"
-    local output_file_path="${output_file_dir}/$(basename "${input_file_path}").done"
+    local output_file_path="${output_file_dir}/$(basename "${input_file_path}").complete"
 
     trace "${FUNCNAME[0]}:${LINENO} input_file_path=${input_file_path} output_file_path=${output_file_path}"
 
@@ -363,7 +363,7 @@ process_input_file () {
 
     cp -f "${output_file_path}" "${chips_auth_shuttle_input_dir}"
     if [[ "$?" -ne 0 ]]; then
-        error "Unable to copy ouput file to shuttle input directory"
+        error "Unable to copy output file to shuttle input directory"
         exit 1
     fi
 
@@ -401,7 +401,7 @@ archive_input_file () {
 
     cp -f "${input_file_path}" "${archive_file_path}"
     if [[ "$?" -ne 0 ]]; then
-        error "Unable to copy ouput file to shuttle input directory"
+        error "Unable to copy input file to archive directory"
         exit 1
     fi
 }
