@@ -1,0 +1,106 @@
+#!/bin/bash
+
+# Insert auth letter records into Informix EF database.
+
+source "{{ informix_install_path }}/etc/informix.env.${USER}"
+
+# -- Internal variables -------------------------------------------------------
+
+script_name=$(basename "$0")
+
+database="ef_db"
+
+log_file="{{ tuxedo_logs_path }}/${USER}/${script_name}.log"
+
+# -- General ------------------------------------------------------------------
+
+log () {
+    local message="$1"
+    tee -a "${log_file}" <<< "$(date --iso-8601=seconds) ${message}"
+}
+
+check_user () {
+    if [[ "${USER}" == "root" ]]; then
+        log "${script_name}: This script should be executed as a Tuxedo service user not root"
+        exit 1
+    fi
+}
+
+exit_on_error () {
+    local exit_code="$1"
+    local message="$2"
+    if [[ "${exit_code}" -ne 0 ]]; then
+        log "Error: ${message}"
+        exit "${exit_code}"
+    fi
+}
+
+create_unload_file () {
+    unload_file=$(mktemp -t "${script_name}.XXXXXXX")
+    exit_on_error "$?" "Unable to create temporary unload file (${FUNCNAME[0]}:${LINENO})"
+}
+
+unload_auth_change_rows () {
+    log "Starting auth change unload operation"
+
+    dbaccess "${database}" - >/dev/null 2>&1 <<EOF
+UNLOAD TO '${unload_file}' DELIMITER ' '
+SELECT comp_no,new_code,action_ind,start_date
+FROM auth_change
+WHERE status ='D'
+AND START_DATE = TODAY -1
+EOF
+    exit_on_error "$?" "dbaccess returned $? (${FUNCNAME[0]}:${LINENO})"
+
+    log "Finished auth change unload operation"
+}
+
+insert_auth_letter_entries () {
+    log "Starting auth letter insert operations"
+
+    while read -r \
+        auth_letter_co_no \
+        auth_letter_code \
+        auth_letter_type \
+        auth_letter_ordered; do
+
+        dbaccess "${database}" - >/dev/null 2>&1 <<EOF
+INSERT INTO auth_letter (
+auth_letter_co_no,
+auth_letter_code,
+auth_letter_ordered,
+auth_letter_issued,
+auth_letter_type,
+auth_letter_output
+)
+VALUES (
+"${auth_letter_co_no}",
+"${auth_letter_ordered}",
+"${auth_letter_code}",
+"CURRENT",
+"${auth_letter_type}",
+"R"
+)
+EOF
+        exit_on_error "$?" "dbaccess returned $? (${FUNCNAME[0]}:${LINENO})"
+    done < "${unload_file}"
+
+    log "Finished auth letter insert operations"
+}
+
+delete_unload_file () {
+    rm -f "${unload_file}"
+    exit_on_error "$?" "Unable to remove temporary file (${FUNCNAME[0]}:${LINENO})"
+}
+
+# -- Entrypoint ---------------------------------------------------------------
+
+main () {
+    check_user
+    create_unload_file
+    unload_auth_change_rows
+    insert_auth_letter_entries
+    delete_unload_file
+}
+
+main "${@}"

@@ -1,0 +1,438 @@
+#!/bin/bash
+
+# Process shuttle files and create/update/disable auth code database entries
+# for individual companies as necessary. Set 'LOGLEVEL' environment variable
+# to the value 'trace' for additional logging.
+
+source "{{ informix_install_path }}/etc/informix.env.${USER}"
+
+# -- Internal variables -------------------------------------------------------
+
+script_name=$(basename "$0")
+
+database="ef_db"
+
+chips_auth_shuttle_input_dir=""
+chips_auth_shuttle_output_dir=""
+
+output_file_dir="${HOME}/eshuttle/done"
+archive_file_dir="${HOME}/eshuttle/archive"
+
+auth_code_digit_count="5"
+
+log_file="{{ tuxedo_logs_path }}/${USER}/${script_name}.log"
+
+# -- General ------------------------------------------------------------------
+
+log () {
+    local level="${1}"
+    local message="$(echo -e ${2})"
+    echo -e  "$(date --iso-8601=seconds) ${level} ${message}" | tee -a "${log_file}"
+}
+
+trace () {
+    local message="${1}"
+    if [[ "${log_level}" == "trace" ]]; then
+        log "TRACE" "${message}"
+    fi
+}
+
+error () {
+    local message="${1}"
+    log "ERROR" "${message}"
+}
+
+info () {
+    local message="${1}"
+    log "INFO" "${message}"
+}
+
+check_user () {
+    if [[ "${USER}" == "root" ]]; then
+        error "${script_name}: This script should be executed as a Tuxedo service user not root"
+        exit 1
+    fi
+}
+
+set_input_files () {
+    input_files=( $(ls ${chips_auth_shuttle_output_dir}) )
+    if [[ "${#input_files[@]}" -eq 0 ]]; then
+        error "There are no input files to process, exiting"
+        exit 1
+    fi
+    trace "${FUNCNAME[0]}:${LINENO} input_files=(${input_files[*]})"
+}
+
+check_shuttle_dirs () {
+    local shuttle_dir_vars=(
+        "chips_auth_shuttle_input_dir"
+        "chips_auth_shuttle_output_dir"
+    )
+
+    local errors="false"
+
+    for shuttle_dir_var in "${shuttle_dir_vars[@]}"; do
+        if [[ -z "${!shuttle_dir_var}" ]]; then
+            error "Script variable '${shuttle_dir_var}' is not set"
+            errors="true"
+        elif [[ ! -d "${!shuttle_dir_var}" ]]; then
+            error "Script variable '${shuttle_dir_var}' references the path '${!shuttle_dir_var}' which does not exist"
+            errors="true"
+        fi
+    done
+
+    if [[ "${errors}" == "true" ]]; then
+        exit 1
+    fi
+}
+
+exit_on_error () {
+    local exit_code="$1"
+    local message="$2"
+
+    if [[ "${exit_code}" -ne 0 ]]; then
+        error "${message}"
+        exit 1
+    fi
+}
+
+get_doc_auth_count () {
+    local company_number="$1"
+
+    local local_doc_auth_count; local_doc_auth_count=$(dbaccess "${database}" - 2>/dev/null <<EOF
+set isolation to dirty read;
+select count(*) from doc_auth where doc_auth_co_no = "${company_number}"
+and doc_auth_end_dt is null
+EOF
+)
+    exit_on_error "$?" "${FUNCNAME[0]}:${LINENO} dbaccess returned $?"
+
+    local_doc_auth_count=$(sed -r 's/.*\s+([0-9]+)/\1/g' <<< "${local_doc_auth_count}")
+
+    if [[ -z "${local_doc_auth_count}" ]]; then
+        error "Unable to determine doc auth count for company number '${company_number}'"
+        exit 1
+    fi
+
+    doc_auth_count="${local_doc_auth_count}"
+    trace "${FUNCNAME[0]}:${LINENO} doc_auth_count=${doc_auth_count}"
+}
+
+get_new_auth_code () {
+    local auth_code_digits=""
+    local iterations=0
+
+    while [[ "${#auth_code_digits}" -lt "${auth_code_digit_count}" ]]; do
+        if [[ "${iterations}" -gt "${auth_code_digit_count}" ]]; then
+            error "Unable to generate sufficient random digits for auth code"
+            exit 1
+        fi
+
+        auth_code_digits+="${RANDOM}"
+        (( iterations += 1))
+    done
+
+    trace "${FUNCNAME[0]}:${LINENO} Took ${iterations} iterations to generate ${auth_code_digit_count} random digits for auth code"
+    auth_code="E$(cut -c1-${auth_code_digit_count} <<< ${auth_code_digits})"
+    trace "${FUNCNAME[0]}:${LINENO} auth_code=${auth_code}"
+}
+
+get_existing_auth_code () {
+    local company_number="$1"
+
+    local local_existing_auth_code; local_existing_auth_code=$(dbaccess "${database}" - 2>/dev/null <<EOF
+set isolation to dirty read;
+select doc_auth_code from doc_auth where doc_auth_co_no = "${company_number}"
+and doc_auth_end_dt is null
+EOF
+)
+    exit_on_error "$?" "${FUNCNAME[0]}:${LINENO} dbaccess returned $?"
+
+    local_existing_auth_code=$(sed -r 's/.*\s+([A-Za-z0-9]+)/\1/g' <<< "${local_existing_auth_code}")
+
+    if [[ -z "${local_existing_auth_code}" ]]; then
+        error "Unable to determine existing auth code"
+        exit 1
+    fi
+
+    auth_code="${local_existing_auth_code}"
+}
+
+insert_doc_auth () {
+    local company_number="$1"
+    local auth_code="$2"
+    local reference="$3"
+
+    trace "${FUNCNAME[0]}:${LINENO} company_number=${company_number} auth_code=${company_number} reference=${company_number}"
+
+    info "Inserting new auth code for company '${company_number}'"
+    
+    dbaccess "${database}" - >/dev/null 2>&1 <<EOF
+INSERT INTO doc_auth (
+doc_auth_co_no,
+doc_auth_code,
+doc_auth_start_dt,
+doc_auth_updated,
+doc_auth_origin,
+doc_auth_origin_ref,
+doc_auth_rec_dt,
+doc_auth_l
+)
+VALUES (
+"${company_number}",
+"${auth_code}",
+TODAY,
+CURRENT,
+"ESH",
+"${reference}",
+TODAY,
+TODAY
+)
+EOF
+    exit_on_error "$?" "${FUNCNAME[0]}:${LINENO} dbaccess returned $?"
+}
+
+update_doc_auth () {
+    local company_number="$1"
+
+    trace "${FUNCNAME[0]}:${LINENO} company_number=${company_number}"
+
+    info "Updating doc auth record for company number '${company_number}'"
+
+    dbaccess "${database}" - >/dev/null 2>&1 <<EOF
+update doc_auth set doc_auth_li = TODAY
+where doc_auth_co_no = "${company_number}"
+and doc_auth_end_dt is null
+EOF
+    exit_on_error "$?" "${FUNCNAME[0]}:${LINENO} dbaccess returned $?"
+}
+
+unload_auth_codes () {
+    local company_number="$1"
+    local file_path="$2"
+
+    trace "${FUNCNAME[0]}:${LINENO} company_number=${company_number} file_path=${file_path}"
+
+    dbaccess "${database}" - >/dev/null 2>&1 <<EOF
+set isolation to dirty read;
+unload to "${file_path}"
+select doc_auth_code from doc_auth where doc_auth_co_no = "${company_number}"
+and doc_auth_end_dt is NULL
+EOF
+    exit_on_error "$?" "${FUNCNAME[0]}:${LINENO} dbaccess returned $?"
+}
+
+insert_auth_letter () {
+    local company_number="$1"
+    local auth_code="$2"
+
+    trace "${FUNCNAME[0]}:${LINENO} company_number=${company_number} auth_code=${auth_code}"
+
+    info "Inserting auth letter record for company number '${company_number}'"
+
+    dbaccess "${database}" - >/dev/null 2>&1 <<EOF
+INSERT INTO auth_letter (
+auth_letter_co_no,
+auth_letter_code,
+auth_letter_ordered,
+auth_letter_issued,
+auth_letter_type,
+auth_letter_output)
+VALUES (
+"${company_number}",
+"${auth_code}",
+CURRENT,
+CURRENT,
+"Q",
+"D"
+)
+EOF
+    exit_on_error "$?" "${FUNCNAME[0]}:${LINENO} dbaccess returned $?"
+}
+
+create_unload_file () {
+    unload_file=$(mktemp -t "${script_name}.XXXXXXX")
+    exit_on_error "$?" "Unable to create temporary unload file (${FUNCNAME[0]}:${LINENO})"
+}
+
+delete_unload_file () {
+    rm -f "${unload_file}"
+    exit_on_error "$?" "Unable to remove temporary file (${FUNCNAME[0]}:${LINENO})"
+}
+
+disable_auth_code () {
+    local company_number="$1"
+    local auth_code="$2"
+    local today="$(date '+%d/%m/%Y')"
+
+    trace "${FUNCNAME[0]}:${LINENO} company_number=${company_number} auth_code=${auth_code} today=${today}"
+
+    info "Disabling auth code for company number '${company_number}'"
+
+dbaccess "${database}" - >/dev/null 2>&1 <<EOF
+update doc_auth
+set doc_auth_end_dt = "${today}"
+where doc_auth_co_no = "${company_number}"
+and doc_auth_code = "${auth_code}"
+EOF
+    exit_on_error "$?" "${FUNCNAME[0]}:${LINENO} dbaccess returned $?"
+}
+
+disable_auth_codes () {
+    local company_number="$1"
+    local file_path="$2"
+
+    trace "${FUNCNAME[0]}:${LINENO} company_number=${company_number} file_path=${file_path}"
+
+    while read -r line; do
+        if [[ -z "${line}" ]]; then
+            continue
+        fi
+
+        local auth_code="$(cut -c1-6 <<< ${line})"
+
+        if [[ -z "${auth_code}" ]]; then
+            error "Unable to determine auth code from unload file"
+            exit 1
+        fi
+
+        disable_auth_code "${company_number}" "${auth_code}" 
+    done < "${file_path}"
+}
+
+process_input_file () {
+    local input_file_path="$1"
+    local output_file_path="${output_file_dir}/$(basename "${input_file_path}").done"
+
+    trace "${FUNCNAME[0]}:${LINENO} input_file_path=${input_file_path} output_file_path=${output_file_path}"
+
+    info "Starting input file processing for ${input_file_path}"
+
+    > "${output_file_path}"
+    if [[ "$?" -ne 0 ]]; then
+        error "Unable to create output file '${output_file_path}'"
+        exit 1
+    fi
+
+    while read -r input_file_line; do
+        if [[ -z "${input_file_line}" ]]; then
+            continue
+        fi
+
+        local company_number=$(cut -c1-8 <<< "${input_file_line}")
+
+        if [[ -z "${input_file_line}" || -z "${company_number}" ]]; then
+            trace "${FUNCNAME[0]}:${LINENO} Skipping empty line in input file '${input_file_path}'"
+            continue
+        fi
+
+        get_doc_auth_count
+
+        case "${doc_auth_count}" in
+            '0')
+		        info "Company number '${company_number}' has no active auth codes"
+                get_new_auth_code
+                insert_doc_auth "${company_number}" "${auth_code}" "$(basename "${input_file_path}")"
+                insert_auth_letter "${company_number}" "${auth_code}"
+                ;;
+            '1')
+		        info "Company number '${company_number}' has one active auth code"
+                get_existing_auth_code
+                update_doc_auth "${company_number}"
+                insert_auth_letter "${company_number}" "${auth_code}"
+                ;;
+            *)
+                info "Company number '${company_number}' has duplicate active auth codes"
+                create_unload_file
+                unload_auth_codes "${company_number}" "${unload_file}"
+                disable_auth_codes "${company_number}" "${unload_file}"
+                delete_unload_file
+
+                get_new_auth_code
+                insert_doc_auth "${company_number}" "${auth_code}" "$(basename "${input_file_path}")"
+                insert_auth_letter "${company_number}" "${auth_code}"
+                ;;
+        esac
+
+        info "Writing to output file '${output_file_path}'"
+        echo "${company_number},${auth_code}" >> "${output_file_path}"
+
+    done < "${input_file_path}"
+
+    info "Copying output file '${output_file_path}' to shuttle input path '${chips_auth_shuttle_input_dir}'"
+
+    cp -f "${output_file_path}" "${chips_auth_shuttle_input_dir}"
+    if [[ "$?" -ne 0 ]]; then
+        error "Unable to copy ouput file to shuttle input directory"
+        exit 1
+    fi
+
+    info "Finished input file processing for ${input_file_path}"
+}
+
+create_dir_if_not_exists () {
+    local dir_path="${1}"
+
+    if [[ ! -d "${dir_path}" ]]; then
+        info "Creating directory '${dir_path}'"
+        mkdir -p "${dir_path}"
+        if [[ "$?" -ne 0 ]]; then
+            error "Unable to create directory '${dir_path}'"
+            exit 1
+        fi
+    fi
+}
+
+process_input_files () {
+    while read -r -d $'\0' input_file_path; do
+        process_input_file "${input_file_path}"
+        archive_input_file "${input_file_path}"
+        delete_input_file "${input_file_path}"
+    done < <(find "${chips_auth_shuttle_output_dir}" -maxdepth 1 -type f -print0)
+}
+
+archive_input_file () {
+    local input_file_path="$1"
+    local archive_file_path="${archive_file_dir}/$(basename ${input_file_path})"
+
+    trace "${FUNCNAME[0]}:${LINENO} input_file_path=${input_file_path} archive_file_path=${archive_file_path}"
+
+    info "Archiving file '${input_file_path}' to path '${archive_file_path}'"
+
+    cp -f "${input_file_path}" "${archive_file_path}"
+    if [[ "$?" -ne 0 ]]; then
+        error "Unable to copy ouput file to shuttle input directory"
+        exit 1
+    fi
+}
+
+delete_input_file () {
+    local input_file_path="$1"
+
+    trace "${FUNCNAME[0]}:${LINENO} input_file_path=${input_file_path}"
+
+    info "Deleting file '${input_file_path}'"
+
+    rm -f "${input_file_path}"
+}
+
+initialise_logging () {
+    log_level=$(echo "${LOGLEVEL:-INFO}" | tr '[:upper:]' '[:lower:]')
+}
+
+# -- Entrypoint ---------------------------------------------------------------
+
+main () {
+    initialise_logging
+
+    check_user
+    check_shuttle_dirs
+    set_input_files
+
+    create_dir_if_not_exists "${output_file_dir}"
+    create_dir_if_not_exists "${archive_file_dir}"
+
+    process_input_files
+}
+
+main "${@}"

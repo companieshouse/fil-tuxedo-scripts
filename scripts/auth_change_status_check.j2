@@ -1,0 +1,104 @@
+#!/bin/bash
+
+# Generate email alerts for auth change records showing status 'v'.
+
+source "{{ informix_install_path }}/etc/informix.env.${USER}"
+
+# -- Internal variables -------------------------------------------------------
+
+script_name=$(basename "$0")
+
+database="ef_db"
+
+error_threshold="0"
+error_threshold_exceeded="false"
+
+# -- General ------------------------------------------------------------------
+
+check_user () {
+    if [[ "${USER}" == "root" ]]; then
+        echo "${script_name}: This script should be executed as a Tuxedo service user not root" >&2
+        exit 1
+    fi
+}
+
+exit_on_error () {
+    local exit_code="$1"
+    local message="$2"
+    if [[ "${exit_code}" -ne 0 ]]; then
+        echo "Error: ${message}" >&2
+        exit "${exit_code}"
+    fi
+}
+
+create_mail_file () {
+    mail_file=$(mktemp -t "${script_name}.XXXXXXX")
+    exit_on_error "$?" "Unable to create temporary mail file (${FUNCNAME[0]}:${LINENO})"
+}
+
+create_unload_file () {
+    unload_file=$(mktemp -t "${script_name}.XXXXXXX")
+    exit_on_error "$?" "Unable to create temporary unload file (${FUNCNAME[0]}:${LINENO})"
+}
+
+unload_auth_change_rows () {
+    dbaccess "${database}" - >/dev/null 2>&1 <<EOF
+set isolation dirty read;
+unload to ${unload_file}
+select comp_no
+from auth_change
+where status ='V'
+and start_date = today -1
+EOF
+    exit_on_error "$?" "dbaccess returned $? (${FUNCNAME[0]}:${LINENO})"
+}
+
+check_errors () {
+    if [[ $(wc -l < "${unload_file}") -gt "${error_threshold}" ]]; then
+        append_mail_file "Actions required:"
+        append_mail_file "- Frontend support: please raise a ticket with details captured from the frontend system in order for database inserts to be performed with the company auth code and assign to the Image Team"
+        append_mail_file "- Image Team: please see link for details: https://companieshouse.atlassian.net/wiki/spaces/TIS/pages/3374907404/Company+at+Status+V+in+EF\n"
+        error_threshold_exceeded="true"
+    fi
+}
+
+delete_unload_file () {
+    rm -f "${unload_file}"
+    exit_on_error "$?" "Unable to remove temporary file (${FUNCNAME[0]}:${LINENO})"
+}
+
+append_mail_file () {
+    local message="$1"
+    echo -e "${message}" >> "${mail_file}"
+}
+
+delete_mail_file () {
+    rm -f "${mail_file}"
+}
+
+# -- Alerts -------------------------------------------------------------------
+
+send_alert () {
+{% if alerts.enabled %}
+    mailx -r "${USER}@$(hostname)" -s "WARNING - status 'v' in $(tr '[:lower:]' '[:upper:]' <<< "${USER}") auth_change table" {% for recipient in alerts_config.auth_change_status_check %}{{ recipient }} {% endfor %}< "${mail_file}"
+{% else %}
+    echo "Alerts disabled; no mail message(s) will be generated"
+{% endif %}
+}
+
+# -- Entrypoint ---------------------------------------------------------------
+
+main () {
+    check_user
+    create_mail_file
+    create_unload_file
+    unload_auth_change_rows
+    check_errors
+
+    if [[ "${error_threshold_exceeded}" == "true" ]]; then
+        send_alert
+    fi
+
+    delete_unload_file
+    delete_mail_file
+}
