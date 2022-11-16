@@ -1,0 +1,252 @@
+#!/bin/bash
+
+# Disable auth codes for dissolved companies. Set 'LOGLEVEL' environment variable
+# to the value 'trace' for additional logging.
+
+source "{{ informix_install_path }}/etc/informix.env.${USER}"
+
+# -- Internal variables -------------------------------------------------------
+
+script_name=$(basename "$0")
+
+database="ef_db"
+
+chips_auth_dissolved_output_dir=""
+
+output_file_dir="${HOME}/dat/dissolved/complete"
+archive_file_dir="${HOME}/dat/dissolved/archive"
+
+auth_code_digit_count="5"
+
+log_file="{{ tuxedo_logs_path }}/${USER}/${script_name}.log"
+
+# -- General ------------------------------------------------------------------
+
+log () {
+    local level="${1}"
+    local message="$(echo -e ${2})"
+    echo -e  "$(date --iso-8601=seconds) ${level} ${message}" | tee -a "${log_file}"
+}
+
+trace () {
+    local message="${1}"
+    if [[ "${log_level}" == "trace" ]]; then
+        log "TRACE" "${message}"
+    fi
+}
+
+error () {
+    local message="${1}"
+    log "ERROR" "${message}"
+}
+
+info () {
+    local message="${1}"
+    log "INFO" "${message}"
+}
+
+check_user () {
+    if [[ "${USER}" == "root" ]]; then
+        error "${script_name}: This script should be executed as a Tuxedo service user not root"
+        exit 1
+    fi
+}
+
+set_input_files () {
+    input_files=( $(ls ${chips_auth_dissolved_output_dir}) )
+    if [[ "{{ '${#input_files[@]}' }}" -eq 0 ]]; then
+        error "There are no input files to process"
+        return 1
+    fi
+    trace "${FUNCNAME[0]}:${LINENO} input_files=(${input_files[*]})"
+
+    return 0
+}
+
+check_dissolved_dirs () {
+    local dissolved_dir_vars=(
+        "chips_auth_dissolved_output_dir"
+    )
+
+    local errors="false"
+
+    for dissolved_dir_var in "${dissolved_dir_vars[@]}"; do
+        if [[ -z "${!dissolved_dir_var}" ]]; then
+            error "Script variable '${dissolved_dir_var}' is not set"
+            errors="true"
+        elif [[ ! -d "${!dissolved_dir_var}" ]]; then
+            error "Script variable '${dissolved_dir_var}' references the path '${!dissolved_dir_var}' which does not exist"
+            errors="true"
+        fi
+    done
+
+    if [[ "${errors}" == "true" ]]; then
+        exit 1
+    fi
+}
+
+exit_on_error () {
+    local exit_code="$1"
+    local message="$2"
+
+    if [[ "${exit_code}" -ne 0 ]]; then
+        error "${message}"
+        exit 1
+    fi
+}
+
+create_mail_file () {
+    mail_file=$(mktemp -t "${script_name}.XXXXXXX")
+    exit_on_error "$?" "Unable to create temporary mail file (${FUNCNAME[0]}:${LINENO})"
+}
+
+disable_auth_codes () {
+    local company_number="$1"
+
+    trace "${FUNCNAME[0]}:${LINENO} company_number=${company_number}"
+
+    info "Disabling auth code(s) for company number '${company_number}'"
+
+    dbaccess "${database}" - >/dev/null 2>&1 <<EOF
+update doc_auth set doc_auth_end_dt = CURRENT,
+doc_auth_closed_by = "dissolved job"
+where doc_auth_co_no = "${company_number}"
+and doc_auth_end_dt is NULL;
+EOF
+    exit_on_error "$?" "${FUNCNAME[0]}:${LINENO} dbaccess returned $?"
+}
+
+process_input_file () {
+    local input_file_path="$1"
+    local output_file_path="${output_file_dir}/$(basename "${input_file_path}").complete"
+
+    trace "${FUNCNAME[0]}:${LINENO} input_file_path=${input_file_path} output_file_path=${output_file_path}"
+
+    info "Starting input file processing for ${input_file_path}"
+
+    local count=0
+
+    while read -r company_number; do
+        if [[ -z "${company_number}" ]]; then
+            continue
+        fi
+
+        disable_auth_codes "${company_number}"
+        info "Company number '${company_number}' dissolved"
+        (( count += 1))
+
+        info "Writing to output file '${output_file_path}'"
+        echo "${company_number}" >> "${output_file_path}"
+
+    done < "${input_file_path}"
+
+    append_mail_file "${count} companies have had their auth codes closed off today (original input file: '$(basename ${input_file_path})')"
+
+    info "Finished input file processing for ${input_file_path}"
+}
+
+create_dir_if_not_exists () {
+    local dir_path="${1}"
+
+    if [[ ! -d "${dir_path}" ]]; then
+        info "Creating directory '${dir_path}'"
+        mkdir -p "${dir_path}"
+        if [[ "$?" -ne 0 ]]; then
+            error "Unable to create directory '${dir_path}'"
+            exit 1
+        fi
+    fi
+}
+
+process_input_files () {
+    while read -r -d $'\0' input_file_path; do
+        process_input_file "${input_file_path}"
+        archive_input_file "${input_file_path}"
+        delete_input_file "${input_file_path}"
+    done < <(find "${chips_auth_dissolved_output_dir}" -maxdepth 1 -type f -print0)
+}
+
+archive_input_file () {
+    local input_file_path="$1"
+    local archive_file_path="${archive_file_dir}/$(basename ${input_file_path})"
+
+    trace "${FUNCNAME[0]}:${LINENO} input_file_path=${input_file_path} archive_file_path=${archive_file_path}"
+
+    info "Archiving file '${input_file_path}' to path '${archive_file_path}'"
+
+    cp -f "${input_file_path}" "${archive_file_path}"
+    if [[ "$?" -ne 0 ]]; then
+        error "Unable to copy input file to archive directory"
+        exit 1
+    fi
+}
+
+delete_input_file () {
+    local input_file_path="$1"
+
+    trace "${FUNCNAME[0]}:${LINENO} input_file_path=${input_file_path}"
+
+    info "Deleting file '${input_file_path}'"
+
+    rm -f "${input_file_path}"
+}
+
+initialise_logging () {
+    log_level=$(echo "${LOGLEVEL:-INFO}" | tr '[:upper:]' '[:lower:]')
+}
+
+append_mail_file () {
+    local message="$1"
+    echo -e "${message}" >> "${mail_file}"
+}
+
+delete_mail_file () {
+    rm -f "${mail_file}"
+}
+
+# -- Alerts -------------------------------------------------------------------
+
+send_alert () {
+{% if alerts.enabled %}
+    mailx -r "${USER}@$(hostname)" -s "WARNING - auth_diss - $(date)" {% for recipient in alerts_config.auth_diss %}{{ recipient }} {% endfor %}< "${mail_file}"
+{% else %}
+    echo "Alerts disabled; no mail message(s) will be generated"
+{% endif %}
+}
+
+# -- Stats --------------------------------------------------------------------
+
+send_stats () {
+{% if stats.enabled %}
+    mailx -r "${USER}@$(hostname)" -s "INFO - auth_diss - $(date)" {% for recipient in stats_config.auth_diss %}{{ recipient }} {% endfor %}< "${mail_file}"
+{% else %}
+    echo "Stats disabled; no file(s) will be sent"
+{% endif %}
+}
+
+# -- Entrypoint ---------------------------------------------------------------
+
+main () {
+    initialise_logging
+    check_user
+    check_dissolved_dirs
+    create_mail_file
+
+    if ! set_input_files; then
+        append_mail_file "There are no input files to process.\n"
+        send_alert
+        delete_mail_file
+        exit 1
+    fi
+
+    create_dir_if_not_exists "${output_file_dir}"
+    create_dir_if_not_exists "${archive_file_dir}"
+
+    process_input_files
+
+    append_mail_file ""
+    send_stats
+    delete_mail_file
+}
+
+main "${@}"
