@@ -22,7 +22,7 @@ check_user () {
 }
 
 create_mail_file () {
-    mail_file=$(mktemp -t scud_stats.XXXXXXX)
+    mail_file=$(mktemp -t "${script_name}.XXXXXXX")
     if [[ $? -ne 0 ]]; then
         echo "Unable to create temporary mail file" >&2
         exit 1
@@ -86,7 +86,7 @@ add_ind_pre95_top_customers_header () {
 }
 
 add_scud_order_total () {
-    local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
+    local temp_file; temp_file=$(mktemp -t "${script_name}.XXXXXXX")
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
 
     dbaccess "${database}" - >/dev/null 2>&1 <<EOF
@@ -105,7 +105,7 @@ EOF
 }
 
 add_scud_order_completion_count () {
-    local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
+    local temp_file; temp_file=$(mktemp -t "${script_name}.XXXXXXX")
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
 
     dbaccess "${database}" - >/dev/null 2>&1 <<EOF
@@ -125,7 +125,7 @@ EOF
 }
 
 add_pre95_count () {
-    local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
+    local temp_file; temp_file=$(mktemp -t "${script_name}.XXXXXXX")
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
 
     dbaccess "${database}" - >/dev/null 2>&1 <<EOF
@@ -143,7 +143,7 @@ EOF
 }
 
 add_pre95m_count () {
-    local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
+    local temp_file; temp_file=$(mktemp -t "${script_name}.XXXXXXX")
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
 
     dbaccess "${database}" - >/dev/null 2>&1 <<EOF
@@ -161,7 +161,7 @@ EOF
 }
 
 add_ind_pre95_count () {
-    local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
+    local temp_file; temp_file=$(mktemp -t "${script_name}.XXXXXXX")
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
 
     dbaccess "${database}" - >/dev/null 2>&1 <<EOF
@@ -181,7 +181,7 @@ EOF
 }
 
 add_missing_post95_count () {
-    local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
+    local temp_file; temp_file=$(mktemp -t "${script_name}.XXXXXXX")
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
 
     dbaccess "${database}" - >/dev/null 2>&1 <<EOF
@@ -201,7 +201,7 @@ EOF
 }
 
 add_transmitted_pre95_count () {
-    local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
+    local temp_file; temp_file=$(mktemp -t "${script_name}.XXXXXXX")
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
 
     dbaccess "${database}" - >/dev/null 2>&1 <<EOF
@@ -220,7 +220,7 @@ EOF
 }
 
 add_transmitted_pre95m_count () {
-    local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
+    local temp_file; temp_file=$(mktemp -t "${script_name}.XXXXXXX")
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
 
     dbaccess "${database}" - >/dev/null 2>&1 <<EOF
@@ -239,7 +239,7 @@ EOF
 }
 
 add_transmitted_ind_pre95_count () {
-    local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
+    local temp_file; temp_file=$(mktemp -t "${script_name}.XXXXXXX")
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
 
     dbaccess "${database}" - >/dev/null 2>&1 <<EOF
@@ -260,7 +260,7 @@ EOF
 }
 
 add_transmitted_missing_post95_count () {
-    local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
+    local temp_file; temp_file=$(mktemp -t "${script_name}.XXXXXXX")
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
 
     dbaccess "${database}" - >/dev/null 2>&1 <<EOF
@@ -281,7 +281,7 @@ EOF
 }
 
 add_cancelled_pre95_count () {
-    local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
+    local temp_file; temp_file=$(mktemp -t "${script_name}.XXXXXXX")
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
 
     dbaccess "${database}" - >/dev/null 2>&1 <<EOF
@@ -301,7 +301,7 @@ EOF
 }
 
 add_cancelled_pre95m_count () {
-    local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
+    local temp_file; temp_file=$(mktemp -t "${script_name}.XXXXXXX")
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
 
     dbaccess "${database}" - >/dev/null 2>&1 <<EOF
@@ -321,7 +321,7 @@ EOF
 }
 
 add_cancelled_ind_pre95_count () {
-    local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
+    local temp_file; temp_file=$(mktemp -t "${script_name}.XXXXXXX")
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
 
     dbaccess "${database}" - >/dev/null 2>&1 <<EOF
@@ -343,7 +343,7 @@ EOF
 }
 
 add_cancelled_missing_post95_count () {
-    local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
+    local temp_file; temp_file=$(mktemp -t "${script_name}.XXXXXXX")
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
 
     dbaccess "${database}" - >/dev/null 2>&1 <<EOF
@@ -365,7 +365,7 @@ EOF
 }
 
 add_pre95_missing_documents_count () {
-    local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
+    local temp_file; temp_file=$(mktemp -t "${script_name}.XXXXXXX")
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
 
     dbaccess "${database}" - >/dev/null 2>&1 <<EOF
@@ -400,7 +400,7 @@ EOF
 }
 
 add_post95_missing_documents_count () {
-    local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
+    local temp_file; temp_file=$(mktemp -t "${script_name}.XXXXXXX")
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
 
     dbaccess "${database}" - >/dev/null 2>&1 <<EOF
@@ -435,7 +435,7 @@ EOF
 }
 
 add_pre95_top_customers () {
-    local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
+    local temp_file; temp_file=$(mktemp -t "${script_name}.XXXXXXX")
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
 
     dbaccess "${database}" - >/dev/null 2>&1 <<EOF
@@ -461,7 +461,7 @@ EOF
 }
 
 add_pre95m_top_customers () {
-    local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
+    local temp_file; temp_file=$(mktemp -t "${script_name}.XXXXXXX")
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
 
     dbaccess "${database}" - >/dev/null 2>&1 <<EOF
@@ -487,7 +487,7 @@ EOF
 }
 
 add_ind_pre95_top_customers () {
-    local temp_file; temp_file=$(mktemp -t scud_stats.XXXXXXX)
+    local temp_file; temp_file=$(mktemp -t "${script_name}.XXXXXXX")
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
 
     dbaccess "${database}" - >/dev/null 2>&1 <<EOF

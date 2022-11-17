@@ -6,9 +6,11 @@ source "{{ informix_install_path }}/etc/informix.env.${USER}"
 
 # -- Internal variables -------------------------------------------------------
 
+script_name=$(basename "$0")
+
 database="scud"
 
-log_file="{{ tuxedo_logs_path }}/${USER}/orders_archive.log"
+log_file="{{ tuxedo_logs_path }}/${USER}/${script_name}.log"
 
 # -- General ------------------------------------------------------------------
 
@@ -34,7 +36,7 @@ exit_on_error () {
 }
 
 create_unload_file () {
-    unload_file=$(mktemp -t orders_archive_unload_file.XXXXXXX)
+    unload_file=$(mktemp -t "${script_name}.XXXXXXX")
     exit_on_error "$?" "Unable to create temporary unload file (${FUNCNAME[0]}:${LINENO})"
 }
 
