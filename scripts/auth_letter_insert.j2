@@ -49,6 +49,7 @@ SELECT comp_no,new_code,action_ind,start_date
 FROM auth_change
 WHERE status ='D'
 AND START_DATE = TODAY -1
+AND NOT action_ind = 'D'
 EOF
     exit_on_error "$?" "dbaccess returned $? (${FUNCNAME[0]}:${LINENO})"
 
