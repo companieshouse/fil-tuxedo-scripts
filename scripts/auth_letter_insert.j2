@@ -45,7 +45,7 @@ unload_auth_change_rows () {
 
     dbaccess "${database}" - >/dev/null 2>&1 <<EOF
 UNLOAD TO '${unload_file}' DELIMITER ' '
-SELECT comp_no,new_code,action_ind,start_date
+SELECT DISTINCT comp_no,new_code,action_ind,start_date
 FROM auth_change
 WHERE status ='D'
 AND START_DATE = TODAY -1
