@@ -55,8 +55,9 @@ EOF
 
 check_errors () {
     if [[ $(wc -l < "${unload_file}") -gt "${error_threshold}" ]]; then
-        append_mail_file "Actions required:"
-        append_mail_file "- Frontend support: please raise a ticket with details captured from the frontend system in order for database inserts to be performed with the company auth code and assign to the Image Team"
+        cat "${unload_file}" >> "${mail_file}"
+        append_mail_file "\nActions required:-\n"
+        append_mail_file "- Frontend support: please raise a ticket with details captured from the frontend system in order for database inserts to be performed with the company auth code and assign to the Image Team\n"
         append_mail_file "- Image Team: please see link for details: https://companieshouse.atlassian.net/wiki/spaces/TIS/pages/3374907404/Company+at+Status+V+in+EF\n"
         error_threshold_exceeded="true"
     fi
@@ -102,3 +103,5 @@ main () {
     delete_unload_file
     delete_mail_file
 }
+
+main "${@}"
