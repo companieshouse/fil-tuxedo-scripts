@@ -6,6 +6,11 @@
 
 script_name=$(basename "$0")
 
+sms_log="{{ tuxedo_logs_path }}/${USER}/sms_poll.log"
+sms_log_lines="50"
+
+error_threshold="0"
+
 # -- General ------------------------------------------------------------------
 
 check_user () {
@@ -35,6 +40,13 @@ check_daemon () {
     fi
 }
 
+check_network_errors () {
+    if [[ $(tail -${sms_log_lines} "${sms_log}" | grep -c "network connection is broken") -gt ${error_threshold} ]]; then
+        echo "${script_name}: database connection is broken" >&2
+        echo -e "SMS Polling program database connection is broken and the daemon will need to be restarted\n" >> "${mail_file}"
+    fi
+}
+
 delete_mail_file () {
     rm -f "${mail_file}"
 }
@@ -57,6 +69,7 @@ main () {
     check_user
     create_mail_file
     check_daemon
+    check_network_errors
 
     if [[ -s "${mail_file}" ]]; then
         send_alert "WARNING - SMS Polling" "${mail_file}"
