@@ -1,0 +1,310 @@
+#!/bin/bash
+
+# Generate OIS function call statistics and send email to recipients. 
+
+# -- Internal variables -------------------------------------------------------
+
+script_name=$(basename "$0")
+parent_dir="$(cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd)"
+
+database="prod"
+
+today=$(date "+%Y-%m-%d")
+yesterday=$(date --date="${today} -1 day" "+%Y-%m-%d")
+
+informix_env_files_dir="/opt/informix/14.10/etc"
+informix_env_file_prefix="informix.env"
+
+# -- General ------------------------------------------------------------------
+
+create_unload_file () {
+    unload_file=$(mktemp -t "unload.${script_name}.XXXXXXX")
+    exit_on_error "$?" "Unable to create temporary unload file (${FUNCNAME[0]}:${LINENO})"
+}
+
+delete_unload_file () {
+    rm -f "${unload_file}"
+    exit_on_error "$?" "Unable to remove temporary file (${FUNCNAME[0]}:${LINENO})"
+}
+
+create_stats_totals_file () {
+    stats_totals_file=$(mktemp -t "stats-totals.${script_name}.XXXXXXX")
+    exit_on_error "$?" "Unable to create temporary unload file (${FUNCNAME[0]}:${LINENO})"
+}
+
+delete_stats_totals_file () {
+    rm -f "${stats_totals_file}"
+    exit_on_error "$?" "Unable to remove stats totals file (${FUNCNAME[0]}:${LINENO})"
+}
+
+create_stats_averages_file () {
+    stats_averages_file=$(mktemp -t "stats-averages.${script_name}.XXXXXXX")
+    exit_on_error "$?" "Unable to create temporary unload file (${FUNCNAME[0]}:${LINENO})"
+}
+
+delete_stats_averages_file () {
+    rm -f "${stats_averages_file}"
+    exit_on_error "$?" "Unable to remove stats averages file (${FUNCNAME[0]}:${LINENO})"
+}
+
+collate_function_call_averages () {
+    local service="${1}"
+
+    local function_numbers=($(
+        seq 1 13 &&
+        seq 17 18 &&
+        seq 20 20 &&
+        seq 23 25 &&
+        seq 27 28 &&
+        seq 30 31
+    ))
+
+    for function_number in "${function_numbers[@]}"; do
+        
+        create_unload_file
+
+        trace "Unloading to '${unload_file}'; service='${service}' function_number='${function_number}' start_date='${start_date}' end_date='${end_date}'"
+
+        dbaccess "${database}" - >/dev/null 2>&1 <<EOF
+UNLOAD TO ${unload_file}
+SELECT average
+FROM ois_stats
+WHERE service = "${service}"
+AND function = ${function_number}
+AND date >= "${start_date}"
+AND date <= "${end_date}";
+EOF
+        exit_on_error "$?" "dbaccess returned $? (${FUNCNAME[0]}:${LINENO})"
+
+        local total=0
+        local items=0
+        local average_time=0
+
+        while read -r item_count; do
+            items=$(echo "scale=2; ${items} + 1" | bc)
+            total=$(echo "scale=3; ${total} + ${item_count}" | bc)
+            average_time=$(echo "scale=3; ${total} / ${items}" | bc)
+        done < <(sed -e 's/|//g' ${unload_file})
+
+        echo "${service},${function_number},${average_time}" >> "${stats_averages_file}"
+
+        delete_unload_file
+    done
+}
+
+collate_function_call_totals () {
+    local service="${1}"
+
+    local function_numbers=($(
+        seq 1 13 &&
+        seq 17 18 &&
+        seq 20 20 &&
+        seq 23 25 &&
+        seq 27 28 &&
+        seq 30 31
+    ))
+
+    for function_number in "${function_numbers[@]}"; do
+        
+        create_unload_file
+
+        trace "Unloading to '${unload_file}'; service='${service}' function_number='${function_number}' start_date='${start_date}' end_date='${end_date}'"
+
+        dbaccess "${database}" - >/dev/null 2>&1 <<EOF
+UNLOAD TO ${unload_file}
+SELECT total
+FROM ois_stats
+WHERE service = "${service}"
+AND function = ${function_number}
+AND date >= "${start_date}"
+AND date <= "${end_date}";
+EOF
+        exit_on_error "$?" "dbaccess returned $? (${FUNCNAME[0]}:${LINENO})"
+
+        local total=0
+
+        while read -r item_count; do
+            (( total += ${item_count} ))
+        done < <(sed -e 's/|//g' ${unload_file})
+
+        echo "${service},${function_number},${total}" >> "${stats_totals_file}"
+
+        delete_unload_file
+    done
+}
+
+set_start_and_end_date () {
+    local start_date_arg="${1}"
+    local end_date_arg="${2}"
+
+    local date_fmt_first_day_of_month
+    local date_format="+%d/%m/%Y"
+
+    if [[ -z "${start_date}" && -z "${end_date}" ]]; then
+        start_date=$(date --date="${yesterday}" "+01/%m/%Y")
+        end_date=$(date --date="${yesterday}" "${date_format}")
+    elif [[ "${start_date}" == "daily" && -z "${end_date}" ]]; then
+        start_date=$(date --date="${yesterday}" "${date_format}")
+        end_date=$(date --date="${yesterday}" "${date_format}")
+    elif [[ -n "${start_date}" && -n "${end_date}" ]]; then
+        for date_string in "${start_date_arg}" "${end_date_arg}"; do
+            if ! valid_date "${date_string}"; then
+                error "Invalid date or format for value '${date_string}'; expected DD/MM/YYYY"
+                exit 1
+            fi
+        done
+
+        start_date="${start_date_arg}"
+        end_date="${end_date_arg}"
+    else
+        error "usage: ${script_name} 'daily' or ${script_name} <start-date> <end-date> (using date format DD/MM/YYYY)"
+        exit 1
+    fi
+}
+
+valid_date () {
+    local date_string_error="false"
+    
+    if [[ ! "${date_string}" =~ ^[0-9]{2}/[0-9]{2}/[0-9]{4}$ ]]; then
+        date_string_error="true"
+    fi
+
+    if ! date -d "${date_string}" >/dev/null 2>&1; then
+        date_string_error="true"
+    fi
+
+    if [[ "${date_string_error}" == "true" ]]; then
+        return 1
+    fi
+
+    return 0
+}
+
+unset_informix_env_vars () {
+    for env_var in INFORMIXSERVER INFORMIXDIR ONCONFIG INFORMIXSQLHOSTS; do
+        unset "${env_var}"
+    done
+}
+
+check_informix_env_vars () {
+    local missing_env_vars=()
+
+    for env_var in INFORMIXSERVER INFORMIXDIR ONCONFIG INFORMIXSQLHOSTS; do
+        if [[ -z "${!env_var}" ]]; then
+            missing_env_vars+=("${env_var}")
+        fi
+    done
+
+    if [[ "{{ '${#missing_env_vars[@]}' }}" -gt 0 ]]; then
+        for env_var in "${missing_env_vars[@]}"; do
+            error "Missing environment variable '${env_var}'"
+        done
+
+        error "Aborting"
+        exit 1
+    fi
+}
+
+check_informix_config () {
+    local env_file_path="${informix_env_files_dir}/${informix_env_file_prefix}.${service}"
+
+    if [[ ! -f "${env_file_path}" ]]; then
+        error "No configuration file at '${env_file_path}'"
+        exit 1
+    fi
+}
+
+source_informix_config () {
+    local env_file_path="${informix_env_files_dir}/${informix_env_file_prefix}.${service}"
+
+    source "${env_file_path}"
+    if [[ $? -ne 0 ]]; then
+        error "Unable to load Informix database configuration from '${env_file_path}'"
+        exit 1
+    fi
+}
+
+load_logging_functions () {
+    source "${parent_dir}/logging"
+    if [[ $? -ne 0 ]]; then
+        echo "${script_name}: Unable to source logging functions into environment" >&2
+        exit 1
+    fi
+
+    initialise_logging
+}
+
+exit_on_error () {
+    local exit_code="${1}"
+    local message="${2}"
+    if [[ "${exit_code}" -ne 0 ]]; then
+        error "${message}"
+        exit "${exit_code}"
+    fi
+}
+
+# -- Stats --------------------------------------------------------------------
+
+send_stats () {
+    local source_file="${1}"
+    local email_file="${2}"
+    local subject="${3}"
+
+{% if stats.enabled %}
+    pushd /tmp >/dev/null
+    cp -f "${source_file}" "${email_file}"
+    mailx -r "${USER}@$(hostname)" -a "${email_file}" -s "${subject}" {% for recipient in stats_config.ois_stats_production_recipients %}{{ recipient }} {% endfor %}<<< ""
+    rm -f "${email_file}"
+    popd >/dev/null
+{% else %}
+    echo "Stats disabled; no file(s) will be sent"
+{% endif %}
+}
+
+# -- Entrypoint ---------------------------------------------------------------
+
+main () {
+    local start_date="${1}"
+    local end_date="${2}"
+
+    load_logging_functions
+
+    log_file="{{ informix_logs_path }}/${service}/${script_name}.log"
+
+    info "Starting OIS stats generation"
+
+    # All data will be read from the prod services database
+    service="prod"
+
+    check_informix_config
+    unset_informix_env_vars
+    source_informix_config
+    check_informix_env_vars
+
+    set_start_and_end_date "${start_date}" "${end_date}"
+
+    create_stats_totals_file
+    create_stats_averages_file
+
+    echo "Service,Function,Total Calls" >> "${stats_totals_file}"
+    for service in xml publ ceu wck; do
+        info "Generating '${service}' function call totals with start date '${start_date}' and end date '${end_date}'"
+        collate_function_call_totals "${service}"
+    done
+
+    echo "Service,Function,Average Time" >> "${stats_averages_file}"
+    for service in xml publ ceu wck; do
+        info "Generating '${service}' function call averages with start date '${start_date}' and end date '${end_date}'"
+        collate_function_call_averages "${service}"
+    done
+
+    send_stats "${stats_totals_file}" "oisstatstotals.${today}.csv" "Ois function totals for ${start_date} to ${end_date}"
+    send_stats "${stats_averages_file}" "oisstatsaverages.${today}.csv" "Ois function averages for ${start_date} to ${end_date}"
+
+    delete_stats_totals_file
+    delete_stats_averages_file
+
+    info "Finished OIS stats generation"
+}
+
+main "${@}"
