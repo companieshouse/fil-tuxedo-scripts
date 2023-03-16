@@ -14,7 +14,7 @@ function menu () {
         menu_items+=("Use ${service_name} database environment configuration")
     done < <(find "${informix_env_files_path}" -name "${informix_env_file_prefix}.*" -print0 2>/dev/null)
 
-    if [[ "${#menu_items[@]}" -eq 0 ]]; then
+    if [[ "{{ '${#menu_items[@]}' }}" -eq 0 ]]; then
         echo "No Informix configuration files found matching '${informix_env_files_path}/${informix_env_file_prefix}.*'" >&2
         return 1
     fi
