@@ -106,8 +106,8 @@ load_logging_functions () {
 }
 
 exit_on_error () {
-    local exit_code="$1"
-    local message="$2"
+    local exit_code="${1}"
+    local message="${2}"
     if [[ "${exit_code}" -ne 0 ]]; then
         error "${message}"
         exit "${exit_code}"
