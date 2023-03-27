@@ -36,7 +36,7 @@ function menu () {
 
 	    exec {file_descriptor}<${temp_file}
 	    read -u ${file_descriptor} menu_selection
-	    exec {file_descriptor}>&-
+	    exec {file_descriptor}<&-
 
         rm -f ${temp_file}
 
