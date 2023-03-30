@@ -3,7 +3,7 @@
 function menu () {
     local highlight_colour="\033[38;5;202m"
     local reset_color="\033[0m"
-    local informix_env_files_path="/opt/informix/14.10/etc"
+    local informix_env_files_path="{{ informix_install_path }}/etc"
     local informix_env_file_prefix="informix.env"
 
     menu_items=()

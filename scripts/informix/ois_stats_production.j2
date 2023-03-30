@@ -12,7 +12,7 @@ database="prod"
 today=$(date "+%Y-%m-%d")
 yesterday=$(date --date="${today} -1 day" "+%Y-%m-%d")
 
-informix_env_files_dir="/opt/informix/14.10/etc"
+informix_env_files_dir="{{ informix_install_path }}/etc"
 informix_env_file_prefix="informix.env"
 
 # -- General ------------------------------------------------------------------
