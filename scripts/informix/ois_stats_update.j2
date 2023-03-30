@@ -79,6 +79,10 @@ process_stats_files () {
         local date=$(sed -rn "s|$service\.func_stats_$server\.(.*)|\1|p" <<< "${stats_file_name}")
 
         while read -r function_number total average; do
+            if [[ -z "${function_number}" ]]; then
+                continue
+            fi
+
             insert_database_statistics \
                 "${date}" \
                 "${server}" \
