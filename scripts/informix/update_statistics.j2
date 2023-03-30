@@ -8,7 +8,7 @@
 script_name=$(basename "$0")
 parent_dir="$(cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd)"
 
-informix_env_files_dir="/opt/informix/14.10/etc"
+informix_env_files_dir="{{ informix_install_path }}/etc"
 informix_env_file_prefix="informix.env"
 
 # -- General ------------------------------------------------------------------
