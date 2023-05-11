@@ -24,7 +24,7 @@ informix_logical_logs_dir="/db_dump"
 informix_logical_logs_archive_dir="/db_dump/xdump"
 informix_continuous_backup_delay_seconds="5"
 
-max_archived_logical_log_days="2"
+max_archived_logical_log_days="4"
 
 today=$(date +%d%m%y)
 yesterday=$(date --date=yesterday +%d%m%y)
@@ -149,14 +149,24 @@ archive_logical_log_file () {
 check_continuous_logical_log_backups () {
     local found_existing_continuous_backups="false"
 
-    for pid in $(pgrep -f 'ontape -c'); do
-        trace "Found existing continuous logical log backup process with PID '${pid}'"
-        found_existing_continuous_backups="true"
+    ontape_pids=( $(pgrep -f 'ontape -c') )
+
+    if [[ "{{ '${#ontape_pids[@]}' }}" -eq 0 ]]; then
+        trace "No continuous logical log backup processes found for service '${service}'"
+        return
+    fi
+
+    for ontape_pid in "${ontape_pids[@]}"; do
+        local ontape_service=$(cat /proc/${ontape_pid}/environ | xargs -0 -l | grep ONCONFIG | sed -r 's/.*\.(.*)/\1/')
+
+        if [[ "${ontape_service}" = "${service}" ]]; then
+            trace "Found existing continuous logical log backup process with PID '${ontape_pid}' for service '${service}'"
+            found_existing_continuous_backups="true"
+        fi
     done
 
     if [[ "${found_existing_continuous_backups}" == "true" ]]; then
-        error "There are active continuous logical log backups (ontape -c); stop all existing continuous backups with 'stop_all_logicals' before attempting to start"
-        send_alert
+        error "There are active continuous logical log backups (ontape -c) for service '${service}'; stop all existing continuous backups with 'stop_all_logicals' before attempting to start"
         exit 1
     fi
 }
