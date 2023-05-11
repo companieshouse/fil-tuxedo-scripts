@@ -159,7 +159,7 @@ start_level_zero_backup () {
 
 cleanup_archived_level_zero_backups () {
     info "Deleting archived level zero backups older than ${max_archived_level_zero_backup_days} days"
-    find "${informix_level_zero_backups_archive_dir}" -maxdepth 1 -type f -name "${service}level0.*" -mtime +"${max_archived_level_zero_backup_days}" -delete -print
+    find "${informix_level_zero_backups_archive_dir}" -maxdepth 1 -type f -name "${service}level0.*" -mtime +"${max_archived_level_zero_backup_days}" -delete -print >> "${log_file}"
 }
 
 exit_on_error () {

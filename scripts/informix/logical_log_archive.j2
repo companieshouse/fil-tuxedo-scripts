@@ -208,7 +208,7 @@ start_continuous_logical_log_backup () {
 
 cleanup_archived_logical_logs () {
     info "Deleting archived logical logs older than ${max_archived_logical_log_days} days"
-    find "${informix_logical_logs_archive_dir}" -maxdepth 1 -type f -name "${service}logical.*" -mtime +"${max_archived_logical_log_days}" -delete -print
+    find "${informix_logical_logs_archive_dir}" -maxdepth 1 -type f -name "${service}logical.*" -mtime +"${max_archived_logical_log_days}" -delete -print >> "${log_file}"
 }
 
 exit_on_error () {
