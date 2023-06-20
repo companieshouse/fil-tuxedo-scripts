@@ -1,0 +1,203 @@
+#!/bin/bash
+
+# Auth code letter generation processing.
+
+source "{{ informix_install_path }}/etc/informix.env.${USER}"
+
+# -- Internal variables -------------------------------------------------------
+
+script_name=$(basename "$0")
+
+database="ef_db"
+
+today=$(date +%d%m%y)
+
+redtitan_data_files_dir="/data1/redtitan/lettin"
+redtitan_output_dir="/data1/redtitan/printout"
+redtitan_output_file="AUTHCODE.txt"
+archive_file_dir="/data1/redtitan/printbak"
+archive_file_suffix=$(date +%d%m%Y)
+
+chips_output_dir="/home/ef/wlenvp1letteroutput/afpInputOutput/authcodeInput"
+
+log_file="{{ tuxedo_logs_path }}/${USER}/${script_name}.log"
+
+# -- General ------------------------------------------------------------------
+
+log () {
+    local level="${1}"
+    local message="$(echo -e ${2})"
+    echo -e  "$(date --iso-8601=seconds) ${level} ${message}" | tee -a "${log_file}"
+}
+
+trace () {
+    local message="${1}"
+    if [[ "${log_level}" == "trace" ]]; then
+        log "TRACE" "${message}"
+    fi
+}
+
+error () {
+    local message="${1}"
+    log "ERROR" "${message}"
+}
+
+info () {
+    local message="${1}"
+    log "INFO" "${message}"
+}
+
+check_user () {
+    if [[ "${USER}" == "root" ]]; then
+        error "${script_name}: This script should be executed as a Tuxedo service user not root"
+        exit 1
+    fi
+}
+
+check_dir () {
+    local dir_path="${1}"
+    if [[ ! -d "${dir_path}" ]]; then
+        info "Creating directory '${dir_path}'"
+        mkdir -p "${dir_path}"
+        exit_on_error "$?" "Unable to create directory '${dir_path}'"
+    fi
+}
+
+exit_on_error () {
+    local exit_code="${1}"
+    local message="${2}"
+
+    if [[ "${exit_code}" -ne 0 ]]; then
+        error "${message}"
+        exit 1
+    fi
+}
+
+create_mail_file () {
+    mail_file=$(mktemp -t "${script_name}.XXXXXXX")
+    exit_on_error "$?" "Unable to create temporary mail file (${FUNCNAME[0]}:${LINENO})"
+}
+
+create_unload_file () {
+    unload_file=$(mktemp -t "${script_name}.XXXXXXX")
+    exit_on_error "$?" "Unable to create temporary unload file (${FUNCNAME[0]}:${LINENO})"
+}
+
+delete_redtitan_data_files () {
+    info "Deleting redtitan data files"
+    find "${redtitan_data_files_dir}" -name '*.dat' -delete -print 2>/dev/null
+}
+
+update_new_auth_changes () {
+    info "Updating new auth change records"
+
+    dbaccess "${database}" - >>"${mail_file}" 2>&1 <<EOF
+ UPDATE AUTH_CHANGE
+ SET ACTION_IND ='N'
+ WHERE STATUS ='P'
+ AND ACTION_IND in ('T','C')
+EOF
+    exit_on_error "$?" "${FUNCNAME[0]}:${LINENO} dbaccess returned $?"
+}
+
+update_confirm_auth_changes () {
+    info "Updating auth change confirmation records"
+
+    dbaccess "${database}" - >>"${mail_file}" 2>&1 <<EOF
+UPDATE AUTH_CHANGE
+SET ACTION_IND ='C'
+WHERE STATUS ='P'
+AND ACTION_IND ='R'
+EOF
+    exit_on_error "$?" "${FUNCNAME[0]}:${LINENO} dbaccess returned $?"
+}
+ 
+unload_auth_changes () {
+    info "Unloading auth change records"
+
+    append_mail_file "\t* Start : Bulk Auth Letter Run Script at $(date)"
+
+    dbaccess "${database}" - >>"${mail_file}" 2>&1 <<EOF
+UNLOAD TO '${unload_file}' DELIMITER '|'
+SELECT comp_name,comp_no,comp_address1,comp_address2,
+comp_address3,comp_address4,comp_address5,comp_address6,comp_postcode,
+language,action_ind,new_code
+FROM auth_change
+WHERE action_ind IN ('N','D','C')
+AND status ='P'
+EOF
+    exit_on_error "$?" "${FUNCNAME[0]}:${LINENO} dbaccess returned $?"
+
+    sed -e 's/^/107000\|/' ${unload_file} > "${redtitan_output_dir}/${redtitan_output_file}"
+    count="$(wc -l "${redtitan_output_dir}/${redtitan_output_file}" | awk '{ printf $1 }')"
+
+    append_mail_file "\t* Info : Bulk Letter file has ${count} lines in the file"
+    append_mail_file "\t* End : Bulk Auth Letter Run Script at $(date)"
+}
+
+move_output_file () {
+    mv "${redtitan_output_dir}/${redtitan_output_file}" "${chips_output_dir}"
+    if [[ "${?}" -ne 0 ]]; then
+        error "Unable to copy output file to ${chips_output_dir}"
+        exit 1
+    fi
+}
+
+archive_redtitan_output_file () {
+    cp -f "${redtitan_output_dir}/${redtitan_output_file}" "${archive_file_dir}/${redtitan_output_file}.${archive_file_suffix}"
+}
+
+initialise_logging () {
+    log_level=$(echo "${LOGLEVEL:-INFO}" | tr '[:upper:]' '[:lower:]')
+}
+
+append_mail_file () {
+    local message="${1}"
+    echo -e "${message}" >> "${mail_file}"
+}
+
+delete_unload_file () {
+    rm -f "${unload_file}"
+    exit_on_error "$?" "Unable to remove temporary file (${FUNCNAME[0]}:${LINENO})"
+}
+
+delete_mail_file () {
+    rm -f "${mail_file}"
+}
+
+# -- Stats --------------------------------------------------------------------
+
+send_stats () {
+{% if stats.enabled %}
+    mailx -r "${USER}@$(hostname)" -s "Auth Code Letter Run ${today} : DOC1 file contains ${count} company numbers - $(date)" {% for recipient in stats_config.aps_letter_run %}{{ recipient }} {% endfor %}< "${mail_file}"
+{% else %}
+    echo "Stats disabled; no file(s) will be sent"
+{% endif %}
+}
+
+# -- Entrypoint ---------------------------------------------------------------
+
+main () {
+    initialise_logging
+
+    check_user
+    check_dir "${redtitan_data_files_dir}"
+    check_dir "${redtitan_output_dir}"
+    check_dir "${archive_file_dir}"
+
+    create_mail_file
+    create_unload_file
+
+    delete_redtitan_data_files
+    update_new_auth_changes
+    update_confirm_auth_changes
+    unload_auth_changes
+    archive_redtitan_output_file
+    move_output_file
+
+    send_stats
+    delete_unload_file
+    delete_mail_file
+}
+
+main "${@}"
