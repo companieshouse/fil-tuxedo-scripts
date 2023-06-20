@@ -14,6 +14,9 @@ database="ef_db"
 
 log_file="{{ tuxedo_logs_path }}/${USER}/${script_name}.log"
 
+redtitan_data_files_dir="/data1/redtitan/lettin"
+redtitan_output_dir="/data1/redtitan/printout"
+
 # -- General ------------------------------------------------------------------
 
 log () {
@@ -25,6 +28,15 @@ check_user () {
     if [[ "${USER}" == "root" ]]; then
         log "Error: This script should be executed as a Tuxedo service user not root"
         exit 1
+    fi
+}
+
+check_dir () {
+    local dir_path="${1}"
+    if [[ ! -d "${dir_path}" ]]; then
+        log "Creating directory '${dir_path}'"
+        mkdir -p "${dir_path}"
+        exit_on_error "$?" "Unable to create directory '${dir_path}'"
     fi
 }
 
@@ -128,6 +140,10 @@ send_alert () {
 # -- Entrypoint ---------------------------------------------------------------
 
 main () {
+    check_user
+    check_dir "${redtitan_data_files_dir}"
+    check_dir "${redtitan_output_dir}"
+
     run_auth_letters
     create_mail_file
     create_unload_file
