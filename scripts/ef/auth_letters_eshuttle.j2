@@ -328,7 +328,7 @@ process_input_file () {
             continue
         fi
 
-        get_doc_auth_count
+        get_doc_auth_count "${company_number}"
 
         case "${doc_auth_count}" in
             '0')
@@ -339,7 +339,7 @@ process_input_file () {
                 ;;
             '1')
 		        info "Company number '${company_number}' has one active auth code"
-                get_existing_auth_code
+                get_existing_auth_code "${company_number}"
                 update_doc_auth "${company_number}"
                 insert_auth_letter "${company_number}" "${auth_code}"
                 ;;
