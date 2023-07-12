@@ -15,7 +15,7 @@ database="ef_db"
 chips_auth_shuttle_input_dir="/mnt/nfs/oltp/input/shuttle_process"
 chips_auth_shuttle_output_dir="/mnt/nfs/oltp/output/eshuttle_process"
 
-output_file_dir="${HOME}/dat/eshuttle/complete"
+output_file_dir="${HOME}/dat/eshuttle/done"
 archive_file_dir="${HOME}/dat/eshuttle/archive"
 
 auth_code_digit_count="5"
@@ -302,7 +302,7 @@ disable_auth_codes () {
 
 process_input_file () {
     local input_file_path="$1"
-    local output_file_path="${output_file_dir}/$(basename "${input_file_path}").complete"
+    local output_file_path="${output_file_dir}/$(basename "${input_file_path}").done"
 
     trace "${FUNCNAME[0]}:${LINENO} input_file_path=${input_file_path} output_file_path=${output_file_path}"
 
