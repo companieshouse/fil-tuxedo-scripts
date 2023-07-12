@@ -101,13 +101,14 @@ get_doc_auth_count () {
 
     local local_doc_auth_count; local_doc_auth_count=$(dbaccess "${database}" - 2>/dev/null <<EOF
 set isolation to dirty read;
+output to pipe "cat" without headings
 select count(*) from doc_auth where doc_auth_co_no = "${company_number}"
 and doc_auth_end_dt is null
 EOF
 )
     exit_on_error "$?" "${FUNCNAME[0]}:${LINENO} dbaccess returned $?"
 
-    local_doc_auth_count=$(sed -r 's/.*\s+([0-9]+)/\1/g' <<< "${local_doc_auth_count}")
+    local_doc_auth_count=$(sed -rn 's/\s*([0-9]+)\s*/\1/p' <<< "${local_doc_auth_count}")
 
     if [[ -z "${local_doc_auth_count}" ]]; then
         error "Unable to determine doc auth count for company number '${company_number}'"
@@ -142,13 +143,14 @@ get_existing_auth_code () {
 
     local local_existing_auth_code; local_existing_auth_code=$(dbaccess "${database}" - 2>/dev/null <<EOF
 set isolation to dirty read;
+output to pipe "cat" without headings
 select doc_auth_code from doc_auth where doc_auth_co_no = "${company_number}"
 and doc_auth_end_dt is null
 EOF
 )
     exit_on_error "$?" "${FUNCNAME[0]}:${LINENO} dbaccess returned $?"
 
-    local_existing_auth_code=$(sed -r 's/.*\s+([A-Za-z0-9]+)/\1/g' <<< "${local_existing_auth_code}")
+    local_existing_auth_code=$(sed -rn 's/\s*([A-Za-z0-9]+)\s*/\1/p' <<< "${local_existing_auth_code}")
 
     if [[ -z "${local_existing_auth_code}" ]]; then
         error "Unable to determine existing auth code"
