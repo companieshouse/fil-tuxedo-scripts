@@ -332,13 +332,13 @@ process_input_file () {
 
         case "${doc_auth_count}" in
             '0')
-		        info "Company number '${company_number}' has no active auth codes"
+                info "Company number '${company_number}' has no active auth codes"
                 get_new_auth_code
                 insert_doc_auth "${company_number}" "${auth_code}" "$(basename "${input_file_path}")"
                 insert_auth_letter "${company_number}" "${auth_code}"
                 ;;
             '1')
-		        info "Company number '${company_number}' has one active auth code"
+                info "Company number '${company_number}' has one active auth code"
                 get_existing_auth_code "${company_number}"
                 update_doc_auth "${company_number}"
                 insert_auth_letter "${company_number}" "${auth_code}"
