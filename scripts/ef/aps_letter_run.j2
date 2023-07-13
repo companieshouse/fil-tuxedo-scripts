@@ -111,7 +111,18 @@ AND ACTION_IND ='R'
 EOF
     exit_on_error "$?" "${FUNCNAME[0]}:${LINENO} dbaccess returned $?"
 }
- 
+
+update_done_auth_changes () {
+    info "Updating auth change status"
+
+    dbaccess "${database}" - >>"${mail_file}" 2>&1 <<EOF
+UPDATE AUTH_CHANGE
+SET STATUS ='D'
+WHERE STATUS ='P'
+EOF
+    exit_on_error "$?" "${FUNCNAME[0]}:${LINENO} dbaccess returned $?"
+}
+
 unload_auth_changes () {
     info "Unloading auth change records"
 
@@ -193,6 +204,7 @@ main () {
     update_confirm_auth_changes
     unload_auth_changes
     archive_redtitan_output_file
+    update_done_auth_changes
     move_output_file
 
     send_stats
