@@ -15,7 +15,7 @@ database="ef_db"
 chips_auth_shuttle_input_dir="/mnt/nfs/oltp/input/shuttle_process"
 chips_auth_shuttle_output_dir="/mnt/nfs/oltp/output/eshuttle_process"
 
-output_file_dir="${HOME}/dat/eshuttle/complete"
+output_file_dir="${HOME}/dat/eshuttle/done"
 archive_file_dir="${HOME}/dat/eshuttle/archive"
 
 auth_code_digit_count="5"
@@ -101,13 +101,14 @@ get_doc_auth_count () {
 
     local local_doc_auth_count; local_doc_auth_count=$(dbaccess "${database}" - 2>/dev/null <<EOF
 set isolation to dirty read;
+output to pipe "cat" without headings
 select count(*) from doc_auth where doc_auth_co_no = "${company_number}"
 and doc_auth_end_dt is null
 EOF
 )
     exit_on_error "$?" "${FUNCNAME[0]}:${LINENO} dbaccess returned $?"
 
-    local_doc_auth_count=$(sed -r 's/.*\s+([0-9]+)/\1/g' <<< "${local_doc_auth_count}")
+    local_doc_auth_count=$(sed -rn 's/\s*([0-9]+)\s*/\1/p' <<< "${local_doc_auth_count}")
 
     if [[ -z "${local_doc_auth_count}" ]]; then
         error "Unable to determine doc auth count for company number '${company_number}'"
@@ -142,13 +143,14 @@ get_existing_auth_code () {
 
     local local_existing_auth_code; local_existing_auth_code=$(dbaccess "${database}" - 2>/dev/null <<EOF
 set isolation to dirty read;
+output to pipe "cat" without headings
 select doc_auth_code from doc_auth where doc_auth_co_no = "${company_number}"
 and doc_auth_end_dt is null
 EOF
 )
     exit_on_error "$?" "${FUNCNAME[0]}:${LINENO} dbaccess returned $?"
 
-    local_existing_auth_code=$(sed -r 's/.*\s+([A-Za-z0-9]+)/\1/g' <<< "${local_existing_auth_code}")
+    local_existing_auth_code=$(sed -rn 's/\s*([A-Za-z0-9]+)\s*/\1/p' <<< "${local_existing_auth_code}")
 
     if [[ -z "${local_existing_auth_code}" ]]; then
         error "Unable to determine existing auth code"
@@ -163,7 +165,7 @@ insert_doc_auth () {
     local auth_code="$2"
     local reference="$3"
 
-    trace "${FUNCNAME[0]}:${LINENO} company_number=${company_number} auth_code=${company_number} reference=${company_number}"
+    trace "${FUNCNAME[0]}:${LINENO} company_number=${company_number} auth_code=${auth_code} reference=${reference}"
 
     info "Inserting new auth code for company '${company_number}'"
     
@@ -176,7 +178,7 @@ doc_auth_updated,
 doc_auth_origin,
 doc_auth_origin_ref,
 doc_auth_rec_dt,
-doc_auth_l
+doc_auth_li
 )
 VALUES (
 "${company_number}",
@@ -302,7 +304,7 @@ disable_auth_codes () {
 
 process_input_file () {
     local input_file_path="$1"
-    local output_file_path="${output_file_dir}/$(basename "${input_file_path}").complete"
+    local output_file_path="${output_file_dir}/$(basename "${input_file_path}").done"
 
     trace "${FUNCNAME[0]}:${LINENO} input_file_path=${input_file_path} output_file_path=${output_file_path}"
 
@@ -326,18 +328,18 @@ process_input_file () {
             continue
         fi
 
-        get_doc_auth_count
+        get_doc_auth_count "${company_number}"
 
         case "${doc_auth_count}" in
             '0')
-		        info "Company number '${company_number}' has no active auth codes"
+                info "Company number '${company_number}' has no active auth codes"
                 get_new_auth_code
                 insert_doc_auth "${company_number}" "${auth_code}" "$(basename "${input_file_path}")"
                 insert_auth_letter "${company_number}" "${auth_code}"
                 ;;
             '1')
-		        info "Company number '${company_number}' has one active auth code"
-                get_existing_auth_code
+                info "Company number '${company_number}' has one active auth code"
+                get_existing_auth_code "${company_number}"
                 update_doc_auth "${company_number}"
                 insert_auth_letter "${company_number}" "${auth_code}"
                 ;;
