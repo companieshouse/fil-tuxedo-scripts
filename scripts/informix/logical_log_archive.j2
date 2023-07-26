@@ -60,9 +60,7 @@ check_informix_env_vars () {
             error "Missing environment variable '${env_var}'"
         done
 
-        error "Aborting"
-        send_alert
-        exit 1
+        exit_with_error "Aborting due to missing environment variables"
     fi
 }
 
@@ -70,9 +68,7 @@ check_informix_config () {
     local env_file_path="${informix_env_files_dir}/${informix_env_file_prefix}.${service}"
 
     if [[ ! -f "${env_file_path}" ]]; then
-        error "No configuration file at '${env_file_path}'"
-        send_alert
-        exit 1
+        exit_with_error "No configuration file at '${env_file_path}'"
     fi
 }
 
@@ -81,9 +77,7 @@ source_informix_config () {
 
     source "${env_file_path}"
     if [[ $? -ne 0 ]]; then
-        error "Unable to load Informix database configuration from '${env_file_path}'"
-        send_alert
-        exit 1
+        exit_with_error "Unable to load Informix database configuration from '${env_file_path}'"
     fi
 }
 
@@ -100,75 +94,58 @@ load_logging_functions () {
 
 check_logical_logs_dir () {
     if [[ ! -d "${informix_logical_logs_dir}" ]]; then
-        error "Logical logs directory does not exist: '${informix_logical_logs_dir}'"
-        send_alert
-        exit 1
+        exit_with_error "Logical logs directory does not exist: '${informix_logical_logs_dir}'"
     fi
 }
 
 check_logical_logs_archive_dir () {
     if [[ ! -d "${informix_logical_logs_archive_dir}" ]]; then
-        error "Logical logs archive directory does not exist: '${informix_logical_logs_archive_dir}'"
-        send_alert
-        exit 1
+        exit_with_error "Logical logs archive directory does not exist: '${informix_logical_logs_archive_dir}'"
     fi
 }
 
-check_logical_log_file () {
-    local logical_log_file_path="${1}"
+check_current_logical_log_file () {
     if [[ ! -f "${logical_log_file_path}" ]]; then
-        info "Logical log file does not exist: '${logical_log_file_path}'"
-        touch "${logical_log_file_path}" >/dev/null 2>&1
-        chmod 660 "${logical_log_file_path}" >/dev/null 2>&1
-        if [[ ! -f "${logical_log_file_path}" ]]; then
-            error "Unable to create empty logical log file with 660 permissions at '${logical_log_file_path}'"
-            send_alert
-            exit 1
-        fi
-        info "Created empty logical log file: '${logical_log_file_path}'"
+        info "Logical log file does not exist: '${current_logical_log}'"
+        touch "${current_logical_log}" >/dev/null 2>&1
+        exit_on_error "$?" "Unable to create empty logical log file at '${current_logical_log}'"
+
+        chmod 660 "${current_logical_log}" >/dev/null 2>&1
+        exit_on_error "$?" "Unable to set 660 permissions on logical log file at '${current_logical_log}'"
+
+        info "Created empty logical log file: '${current_logical_log}'"
     fi
 }
 
 check_archived_logical_log_file () {
-    local archived_logical_log_file_path="${1}"
-    if [[ -f "${archived_logical_log_file_path}" ]]; then
-        info "Deleting existing logical log archive file '${archived_logical_log_file_path}'"
-        rm -f "${archived_logical_log_file_path}" >/dev/null 2>&1
-        exit_on_error "$?" "Unable to remove existing logical log archive file '${archived_logical_log_file_path}' (${FUNCNAME[0]}:${LINENO})"
+    if [[ -f "${archived_logical_log}" ]]; then
+        info "Deleting existing logical log archive file '${archived_logical_log}'"
+        rm -f "${archived_logical_log}" >/dev/null 2>&1
+        exit_on_error "$?" "Unable to remove existing logical log archive file '${archived_logical_log}'"
     fi
 }
 
 archive_logical_log_file () {
     info "Starting archival of logical log file"
+
     cp "${current_logical_log}" "${archived_logical_log}" >/dev/null 2>&1
     exit_on_error "$?" "Unable to archive logical log file from '${current_logical_log}' to '${archived_logical_log}'"
     info "Archived logical log file from '${current_logical_log}' to '${archived_logical_log}'"
+
+    > "${current_logical_log}"
+    info "Truncated logical log file '${current_logical_log}'"
+
     info "Finished archival of logical log file"
 }
 
 check_continuous_logical_log_backups () {
-    local found_existing_continuous_backups="false"
+    local ontape_pids=( $(pgrep -f 'ontape -c') )
 
-    ontape_pids=( $(pgrep -f 'ontape -c') )
-
-    if [[ "{{ '${#ontape_pids[@]}' }}" -eq 0 ]]; then
-        trace "No continuous logical log backup processes found for service '${service}'"
-        return
+    if [[ "{{ '${#ontape_pids[@]}' }}" -gt 0 ]]; then
+        exit_with_error "Active continuous logical log backup processes (ontape -c) were found; cannot continue"
     fi
 
-    for ontape_pid in "${ontape_pids[@]}"; do
-        local ontape_service=$(cat /proc/${ontape_pid}/environ | xargs -0 -l | grep ONCONFIG | sed -r 's/.*\.(.*)/\1/')
-
-        if [[ "${ontape_service}" = "${service}" ]]; then
-            trace "Found existing continuous logical log backup process with PID '${ontape_pid}' for service '${service}'"
-            found_existing_continuous_backups="true"
-        fi
-    done
-
-    if [[ "${found_existing_continuous_backups}" == "true" ]]; then
-        error "There are active continuous logical log backups (ontape -c) for service '${service}'; stop all existing continuous backups with 'stop_all_logicals' before attempting to start"
-        exit 1
-    fi
+    info "No continuous logical log backup processes (ontape -c) were found"
 }
 
 start_continuous_logical_log_backup () {
@@ -176,15 +153,11 @@ start_continuous_logical_log_backup () {
 
     local logical_tape_device=$(grep "^LTAPEDEV" ${INFORMIXDIR}/etc/${ONCONFIG} | awk '{ print $2; }')
     if [[ -z "${logical_tape_device}" ]]; then
-        error "Unable to determine logical tape device path (LTAPEDEV)"
-        send_alert
-        exit 1
+        exit_with_error "Unable to determine logical tape device path (LTAPEDEV)"
     fi
 
     if [[ "${logical_tape_device}" != "${current_logical_log}" ]]; then
-        error "Logical tape device path (LTAPEDEV) does not match expected path '${current_logical_log}'"
-        send_alert
-        exit 1
+        exit_with_error "Logical tape device path (LTAPEDEV) does not match expected path '${current_logical_log}'"
     fi
 
     trace "Informix logical tape device path: '${logical_tape_device}'"
@@ -196,9 +169,7 @@ start_continuous_logical_log_backup () {
     sleep "${informix_continuous_backup_delay_seconds}"
 
     if ! ps -p "${continuous_backup_pid}" >/dev/null 2>&1; then
-        error "Continuous logical log backup process (${continuous_backup_pid}) terminated early"
-        send_alert
-        exit 1
+        exit_with_error "Continuous logical log backup process (${continuous_backup_pid}) terminated early"
     fi
 
     trace "Continuous logical log backup PID: ${continuous_backup_pid}"
@@ -219,6 +190,12 @@ exit_on_error () {
         send_alert
         exit "${exit_code}"
     fi
+}
+
+exit_with_error () {
+    local message="${1}"
+    local exit_code="255"
+    exit_on_error "${exit_code}" "${message}"
 }
 
 # -- Alerts -------------------------------------------------------------------
@@ -264,12 +241,14 @@ main () {
     trace "Informix logical log: '${current_logical_log}'"
     trace "Informix logical log archive: '${archived_logical_log}'"
 
+    check_continuous_logical_log_backups
     check_logical_logs_dir
     check_logical_logs_archive_dir
-    check_logical_log_file "${current_logical_log}"
-    check_archived_logical_log_file "${archived_logical_log}"
+    check_current_logical_log_file
+    check_archived_logical_log_file
 
-    check_continuous_logical_log_backups
+    archive_logical_log_file
+
     start_continuous_logical_log_backup
 
     cleanup_archived_logical_logs
