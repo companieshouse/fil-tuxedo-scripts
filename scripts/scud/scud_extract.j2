@@ -54,48 +54,68 @@ check_user () {
     fi
 }
 
-exit_on_error () {
-    local exit_code="$1"
-    local message="$2"
-    if [[ "${exit_code}" -ne 0 ]]; then
-        log "${message}"
-        exit "${exit_code}"
+create_mail_file () {
+    mail_file=$(mktemp -t "${script_name}.XXXXXXX")
+    if [[ $? -ne 0 ]]; then
+        echo "Unable to create temporary mail file" >&2
+        exit 1
     fi
 }
 
 delete_extract_file () {
     log "Deleting extract file '${ftf_extract_file}'"
     rm -f "${ftf_extract_file}" 2>/dev/null
+    exit_on_error "$?" "Unable to delete extract file: '${ftf_extract_file}'"
 }
 
 create_extract_file () {
     log "Starting extract file creation process"
 
     if [[ ! -d "${extract_dir}" ]]; then
-        mkdir "${extract_dir}"
-        chmod 0700 "${extract_dir}"
+        mkdir "${extract_dir}" >/dev/null 2>&1
+        exit_on_error "$?" "Unable to create extract directory '${extract_dir}'"
+
+        chmod 0700 "${extract_dir}" >/dev/null 2>&1
+        exit_on_error "$?" "Unable to change permissions of extract directory '${extract_dir}'"
     fi
 
     source "${config_dir}/envfile" && "${app_dir}/extract"
 
+    if [[ ! -f "${extract_file}" ]]; then
+        exit_with_error "Extract file was not created: '${extract_file}'"
+    fi
+
     log "Finished extract file creation process"
 }
 
-copy_extract_file () {
-    log "Starting extract file copy process"
+copy_import_extract_file () {
+    log "Starting copy process for import extract file"
 
-    cp "${extract_file}" "${import_extract_file}"
-    cp "${extract_file}" "${ftf_extract_file}"
-    cp "${extract_file}" "${chips_extract_dir}/scud_trans.$(date +%Y%m%d%H%M%S)"
+    cp "${extract_file}" "${import_extract_file}" >/dev/null 2>&1
+    exit_on_error "$?" "Unable to copy extract file '${extract_file}' to '${import_extract_file}'"
 
-    log "Finished extract file copy process"
+    log "Finished copy process for import extract file"
+}
+
+copy_amended_extract_file () {
+    log "Starting copy process for amended extract file"
+
+    cp "${import_amended_extract_file}" "${ftf_extract_file}" >/dev/null 2>&1
+    exit_on_error "$?" "Unable to copy extract file '${extract_file}' to '${ftf_extract_file}'"
+
+    local chips_extract_file="${chips_extract_dir}/scud_trans.$(date +%Y%m%d%H%M%S)"
+    cp "${import_amended_extract_file}" "${chips_extract_file}"  >/dev/null 2>&1
+    exit_on_error "$?" "Unable to copy extract file '${extract_file}' to '${chips_extract_file}'"
+
+    log "Finished copy process for amended extract file"
 }
 
 export_tiff_images_for_directory () {
     local parent_dir="$1"
     local tiff_subdir="$2"
 
-    pushd "${parent_dir}" >/dev/null
+    pushd "${parent_dir}" >/dev/null 2>&1
+    exit_on_error "$?" "Unable to change working directory (${FUNCNAME[0]}:${LINENO})"
 
     while read -r -d $'\0' tiff_image; do
         log "Exporting TIFF '${parent_dir}/${tiff_image}' to '${tiff_export_dir}/${tiff_image}'"
@@ -109,18 +129,17 @@ export_tiff_images_for_directory () {
         -follow \
         -print0)
 
-    popd >/dev/null
+    popd >/dev/null 2>&1
+    exit_on_error "$?" "Unable to change working directory (${FUNCNAME[0]}:${LINENO})"
 }
 
 export_tiff_images () {
     log "Starting TIFF image export process"
 
-    pushd "${scan_dir}" >/dev/null
+    pushd "${scan_dir}" >/dev/null 2>&1
+    exit_on_error "$?" "Unable to change working directory (${FUNCNAME[0]}:${LINENO})"
 
-    if [[ ! -f "${extract_file}" ]]; then
-        log "Skipping TIFF image export process; extract file not found: '${extract_file}'"
-        return 0
-    elif [[ ! -s "${extract_file}" ]]; then
+    if [[ ! -s "${extract_file}" ]]; then
         log "Skipping TIFF image export process; extract file is empty: '${extract_file}'"
         return 0
     fi
@@ -141,7 +160,8 @@ export_tiff_images () {
 
     done < "${extract_file}"
 
-    popd >/dev/null
+    popd >/dev/null 2>&1
+    exit_on_error "$?" "Unable to change working directory (${FUNCNAME[0]}:${LINENO})"
 
     log "Finished TIFF image export process"
 }
@@ -207,8 +227,7 @@ EOF
 
     day_number=$(head -1 "${temp_file}" 2>/dev/null)
     if [[ -z "${day_number}" ]]; then
-        log "Unable to determine day number from database record"
-        exit 1
+        exit_with_error "Unable to determine day number from database record"
     fi
 
     day_number=$(printf "%03d" "$((day_number))" 2>/dev/null)
@@ -224,15 +243,18 @@ EOF
 cleanup_import_files () {
     log "Starting SCUD import files cleanup"
 
-    pushd "${import_dir}" >/dev/null
+    pushd "${import_dir}" >/dev/null 2>&1
+    exit_on_error "$?" "Unable to change working directory (${FUNCNAME[0]}:${LINENO})"
 
     for document_type in "${document_types[@]}"; do
         rm -f "extract.${document_type}" 2>/dev/null
     done
 
     rm -f -- D* ind_* *part* "${import_header_file}" 2>/dev/null
+    exit_on_error "$?" "Unable to cleanup input files"
 
-    popd >/dev/null
+    popd >/dev/null 2>&1
+    exit_on_error "$?" "Unable to change working directory (${FUNCNAME[0]}:${LINENO})"
 
     log "Finished SCUD import files cleanup"
 }
@@ -249,8 +271,7 @@ create_amended_extract_file () {
     > "${import_amended_extract_file}"
 
     if [[ ! -f "${import_amended_extract_file}" || ! -s "${import_amended_extract_file}" ]]; then
-        log "Failed to create extract file with amended day numbers at '${import_amended_extract_file}'"
-        exit 1
+        exit_with_error "Failed to create extract file with amended day numbers at '${import_amended_extract_file}'"
     fi
 
     log "Finished creating extract file with amended day numbers"
@@ -268,8 +289,7 @@ create_amended_document_id_file () {
     > "${import_amended_document_id_file}"
 
     if [[ ! -f "${import_amended_document_id_file}" || ! -s "${import_amended_document_id_file}" ]]; then
-        log "Failed to create document ID file with amended day numbers at '${import_amended_document_id_file}'"
-        exit 1
+        exit_with_error "Failed to create document ID file with amended day numbers at '${import_amended_document_id_file}'"
     fi
 
     log "Finished creating document ID file with amended day numbers at '${import_amended_document_id_file}'"
@@ -358,11 +378,11 @@ create_import_files () {
     log "Starting SCUD import files creation process"
 
     if [[ ! -f "${import_extract_file}" ]]; then
-        log "Failed SCUD import file creation process; no such file '${import_extract_file}'"
-        exit 1
+        exit_with_error "Failed SCUD import file creation process; no such file '${import_extract_file}'"
     fi
 
-    pushd "${import_dir}" >/dev/null
+    pushd "${import_dir}" >/dev/null 2>&1
+    exit_on_error "$?" "Unable to change working directory (${FUNCNAME[0]}:${LINENO})"
 
     cp "${import_extract_file}" "${import_extract_file_backup_dir}/$(basename ${import_extract_file}).${date_suffix}"
 
@@ -380,7 +400,8 @@ create_import_files () {
     log "Deleting SCUD import extract file '${import_extract_file}'"
     rm -f "${import_extract_file}" 2>/dev/null
 
-    popd >/dev/null
+    popd >/dev/null 2>&1
+    exit_on_error "$?" "Unable to change working directory (${FUNCNAME[0]}:${LINENO})"
 
     log "Finished SCUD import files creation process"
 }
@@ -394,17 +415,58 @@ update_database_records () {
     log "Finished database records update process"
 }
 
+append_mail_file () {
+    local message="$1"
+    echo "${message}" >> "${mail_file}"
+}
+
+delete_mail_file () {
+    rm -f "${mail_file}"
+}
+
+exit_on_error () {
+    local exit_code="${1}"
+    local message="${2}"
+
+    if [[ "${exit_code}" -ne 0 ]]; then
+        error "${message}"
+        send_alert
+        exit "${exit_code}"
+    fi
+}
+
+exit_with_error () {
+    local message="${1}"
+    local exit_code="255"
+
+    exit_on_error "${exit_code}" "${message}"
+}
+
+# -- Alerts -------------------------------------------------------------------
+
+send_alert () {
+{% if alerts.enabled %}
+    mailx -r "${USER}@$(hostname)" -s "Error - scud_extract failure" {% for recipient in alerts_config.scud_extract %}{{ recipient }} {% endfor %}< "${mail_file}"
+{% else %}
+    echo "Alerts disabled; no mail message(s) will be generated"
+{% endif %}
+}
+
+# -- Entrypoint ---------------------------------------------------------------
+
 main () {
     check_user
 
+    create_mail_file
     archive_tiff_dirs
     delete_extract_file
     create_extract_file
-    copy_extract_file
+    copy_import_extract_file
     export_tiff_images
     create_import_files
-
+    copy_amended_extract_file
     update_database_records
+    delete_mail_file
 }
 
 main "${@}"
