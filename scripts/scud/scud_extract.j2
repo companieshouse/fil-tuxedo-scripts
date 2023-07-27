@@ -415,11 +415,6 @@ update_database_records () {
     log "Finished database records update process"
 }
 
-append_mail_file () {
-    local message="$1"
-    echo "${message}" >> "${mail_file}"
-}
-
 delete_mail_file () {
     rm -f "${mail_file}"
 }
@@ -446,7 +441,8 @@ exit_with_error () {
 
 send_alert () {
 {% if alerts.enabled %}
-    mailx -r "${USER}@$(hostname)" -s "Error - scud_extract failure" {% for recipient in alerts_config.scud_extract %}{{ recipient }} {% endfor %}< "${mail_file}"
+    local error_message="SCUD extract processing failed; check log file at '${log_file}'"
+    mailx -r "${USER}@$(hostname)" -s "Error - scud_extract failure" {% for recipient in alerts_config.scud_extract %}{{ recipient }} {% endfor %}<<< "${error_message}"
 {% else %}
     echo "Alerts disabled; no mail message(s) will be generated"
 {% endif %}
