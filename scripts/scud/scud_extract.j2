@@ -65,7 +65,7 @@ create_mail_file () {
 delete_extract_file () {
     log "Deleting extract file '${ftf_extract_file}'"
     rm -f "${ftf_extract_file}" 2>/dev/null
-    exit_on_error "$?" "Unable to delete extract file: '${ftf_extract_file}'"
+    exit_on_error "$?" "Unable to delete extract file '${ftf_extract_file}'"
 }
 
 create_extract_file () {
@@ -101,11 +101,11 @@ copy_amended_extract_file () {
     log "Starting copy process for amended extract file"
 
     cp "${import_amended_extract_file}" "${ftf_extract_file}" >/dev/null 2>&1
-    exit_on_error "$?" "Unable to copy extract file '${extract_file}' to '${ftf_extract_file}'"
+    exit_on_error "$?" "Unable to copy extract file '${import_amended_extract_file}' to '${ftf_extract_file}'"
 
     local chips_extract_file="${chips_extract_dir}/scud_trans.$(date +%Y%m%d%H%M%S)"
     cp "${import_amended_extract_file}" "${chips_extract_file}"  >/dev/null 2>&1
-    exit_on_error "$?" "Unable to copy extract file '${extract_file}' to '${chips_extract_file}'"
+    exit_on_error "$?" "Unable to copy extract file '${import_amended_extract_file}' to '${chips_extract_file}'"
 
     log "Finished copy process for amended extract file"
 }
