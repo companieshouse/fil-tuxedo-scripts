@@ -104,7 +104,7 @@ copy_amended_extract_file () {
     exit_on_error "$?" "Unable to copy extract file '${import_amended_extract_file}' to '${ftf_extract_file}'"
 
     local chips_extract_file="${chips_extract_dir}/scud_trans.$(date +%Y%m%d%H%M%S)"
-    cp "${import_amended_extract_file}" "${chips_extract_file}"  >/dev/null 2>&1
+    cp "${import_amended_extract_file}" "${chips_extract_file}" >/dev/null 2>&1
     exit_on_error "$?" "Unable to copy extract file '${import_amended_extract_file}' to '${chips_extract_file}'"
 
     log "Finished copy process for amended extract file"
