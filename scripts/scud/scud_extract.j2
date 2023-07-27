@@ -54,14 +54,6 @@ check_user () {
     fi
 }
 
-create_mail_file () {
-    mail_file=$(mktemp -t "${script_name}.XXXXXXX")
-    if [[ $? -ne 0 ]]; then
-        echo "Unable to create temporary mail file" >&2
-        exit 1
-    fi
-}
-
 delete_extract_file () {
     log "Deleting extract file '${ftf_extract_file}'"
     rm -f "${ftf_extract_file}" 2>/dev/null
@@ -415,10 +407,6 @@ update_database_records () {
     log "Finished database records update process"
 }
 
-delete_mail_file () {
-    rm -f "${mail_file}"
-}
-
 exit_on_error () {
     local exit_code="${1}"
     local message="${2}"
@@ -453,7 +441,6 @@ send_alert () {
 main () {
     check_user
 
-    create_mail_file
     archive_tiff_dirs
     delete_extract_file
     create_extract_file
@@ -462,7 +449,6 @@ main () {
     create_import_files
     copy_amended_extract_file
     update_database_records
-    delete_mail_file
 }
 
 main "${@}"
