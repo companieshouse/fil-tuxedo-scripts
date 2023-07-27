@@ -74,7 +74,7 @@ create_extract_file () {
     source "${config_dir}/envfile" && "${app_dir}/extract"
 
     if [[ ! -f "${extract_file}" ]]; then
-        exit_with_error "Extract file was not created: '${extract_file}'"
+        exit_with_error "Extract file was not created at '${extract_file}'"
     fi
 
     log "Finished extract file creation process"
@@ -132,7 +132,7 @@ export_tiff_images () {
     exit_on_error "$?" "Unable to change working directory (${FUNCNAME[0]}:${LINENO})"
 
     if [[ ! -s "${extract_file}" ]]; then
-        log "Skipping TIFF image export process; extract file is empty: '${extract_file}'"
+        log "Skipping TIFF image export process; extract file is empty at '${extract_file}'"
         return 0
     fi
 
@@ -179,11 +179,13 @@ archive_document_dirs () {
 
         if [[ ! -d "${tiff_archive_dir}/${company_number}" ]]; then
             log "Creating archival directory for company at '${tiff_archive_dir}/${company_number}'"
-            mkdir "${tiff_archive_dir}/${company_number}"
+            mkdir "${tiff_archive_dir}/${company_number}" >/dev/null 2>&1
+            exit_on_error "$?" "Unable to create archival directory for company at '${tiff_archive_dir}/${company_number}'"
         fi
 
         log "Archiving directory '${document_id_dir}' to '${tiff_archive_dir}/${company_number}/${document_id}'"
-        mv "${document_id_dir}" "${tiff_archive_dir}/${company_number}/${document_id}"
+        mv "${document_id_dir}" "${tiff_archive_dir}/${company_number}/${document_id}" >/dev/null 2>&1
+        exit_on_error "$?" "Unable to archive directory '${document_id_dir}' to '${tiff_archive_dir}/${company_number}/${document_id}'"
     done < <(find "${company_tiff_dir}" \
         -mindepth 1 \
         -maxdepth 1 \
@@ -225,7 +227,7 @@ EOF
     day_number=$(printf "%03d" "$((day_number))" 2>/dev/null)
     exit_on_error "$?" "Unable to convert day number to numeric value or pad with leading zeros (${FUNCNAME[0]}:${LINENO})"
 
-    log "Creating day number file at: '${import_dir}/D${day_number}'"
+    log "Creating day number file at '${import_dir}/D${day_number}'"
     touch "${import_dir}/D${day_number}"
 
     rm -f "${temp_file}"
@@ -376,7 +378,9 @@ create_import_files () {
     pushd "${import_dir}" >/dev/null 2>&1
     exit_on_error "$?" "Unable to change working directory (${FUNCNAME[0]}:${LINENO})"
 
-    cp "${import_extract_file}" "${import_extract_file_backup_dir}/$(basename ${import_extract_file}).${date_suffix}"
+    local import_extract_backup_path="${import_extract_file_backup_dir}/$(basename ${import_extract_file}).${date_suffix}"
+    cp "${import_extract_file}" "${import_extract_backup_path}" >/dev/null 2>&1
+    exit_on_error "$?" "Unable to copy import extract file '${import_extract_file}' to '${import_extract_backup_path}'"
 
     cleanup_import_files
     
@@ -391,6 +395,7 @@ create_import_files () {
 
     log "Deleting SCUD import extract file '${import_extract_file}'"
     rm -f "${import_extract_file}" 2>/dev/null
+    exit_on_error "$?" "Unable to delete SCUD import extract file at '${import_extract_file}'"
 
     popd >/dev/null 2>&1
     exit_on_error "$?" "Unable to change working directory (${FUNCNAME[0]}:${LINENO})"
