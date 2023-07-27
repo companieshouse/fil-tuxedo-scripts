@@ -23,14 +23,14 @@ dir_prefixes=(
 
 delete_scanning_files () {
     echo "Deleting scanning files:"
-    find "${scan_dir}" -type f \( -name '*.TIF' -o -name '*.BSJ' \) -mtime +"${file_max_age_days}" -delete -print
-    find "${scan_dir}" -type l -mtime +"${file_max_age_days}" -delete -print
+    find "$(realpath ${scan_dir})" -type f \( -name '*.TIF' -o -name '*.BSJ' \) -mtime +"${file_max_age_days}" -delete -print
+    find "$(realpath ${scan_dir})" -type l -mtime +"${file_max_age_days}" -delete -print
 }
 
 delete_scanning_directories () {
     echo "Deleting scanning directories:"
     for prefix in "${dir_prefixes[@]}"; do
-        find "${scan_dir}" -maxdepth 1 -type d -name "${prefix}"* -empty -delete -print
+        find "$(realpath ${scan_dir})" -maxdepth 1 -type d -name "${prefix}"* -empty -delete -print
     done
 }
 
