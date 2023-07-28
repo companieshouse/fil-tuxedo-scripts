@@ -71,7 +71,13 @@ create_extract_file () {
         exit_on_error "$?" "Unable to change permissions of extract directory '${extract_dir}'"
     fi
 
-    source "${config_dir}/envfile" && "${app_dir}/extract"
+    if [[ -f "${extract_file}" ]]; then
+        log "Deleting previous extract file at '${extract_file}'"
+        rm -f "${extract_file}" 2>/dev/null
+        exit_on_error "$?" "Unable to delete previous extract file at '${extract_file}'"
+    fi
+
+    source "${config_dir}/envfile" && "${app_dir}/extract" >> "${log_file}"
 
     if [[ ! -f "${extract_file}" ]]; then
         exit_with_error "Extract file was not created at '${extract_file}'"
@@ -230,7 +236,7 @@ EOF
     log "Creating day number file at '${import_dir}/D${day_number}'"
     touch "${import_dir}/D${day_number}"
 
-    rm -f "${temp_file}"
+    rm -f "${temp_file}" 2>/dev/null
     exit_on_error "$?" "Unable to remove temporary file (${FUNCNAME[0]}:${LINENO})"
 }
 
