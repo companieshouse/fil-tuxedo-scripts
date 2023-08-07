@@ -4,7 +4,7 @@ Jinga2 template maintenance scripts for [fil-tuxedo-stack](https://github.com/co
 
 <hr>
 
-These scripts are deployed via CI/CD jobs that utilise an Ansible playbook and are grouped by the service that they relate to. For more information refer to the [fil-tuxedo-stack deployment branch](https://github.com/companieshouse/fil-tuxedo-stack/tree/deployment), as well as the [Maintenance jobs](https://github.com/companieshouse/fil-tuxedo-stack/tree/deployment/roles/deploy#informix-maintenance-jobs) and [Informix maintenance jobs](https://github.com/companieshouse/fil-tuxedo-stack/tree/deployment/roles/management#informix-maintenance-jobs) sections of the project's Ansible 'deploy' and 'management roles respectively.
+These scripts are deployed via CI/CD jobs that utilise an Ansible playbook and are grouped by the service that they relate to. For more information refer to the [fil-tuxedo-stack deployment branch](https://github.com/companieshouse/fil-tuxedo-stack/tree/deployment), as well as the [Maintenance jobs](https://github.com/companieshouse/fil-tuxedo-stack/tree/deployment/roles/deploy#informix-maintenance-jobs) and [Informix maintenance jobs](https://github.com/companieshouse/fil-tuxedo-stack/tree/deployment/roles/management#informix-maintenance-jobs) sections of that project's 'deploy' and 'management' roles documentation respectively.
 
 ## Template scripts
 
