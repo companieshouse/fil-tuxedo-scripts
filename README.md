@@ -2,7 +2,9 @@
 
 Jinga2 template maintenance scripts for [fil-tuxedo-stack](https://github.com/companieshouse/fil-tuxedo-stack) services.
 
-These scripts are deployed via CI/CD jobs that utilise an Ansible playbook and are grouped by the service that the relate to. For more information refer to the [fil-tuxedo-stack deployment branch](https://github.com/companieshouse/fil-tuxedo-stack/tree/deployment) and the [Maintenance jobs](https://github.com/companieshouse/fil-tuxedo-stack/tree/deployment/roles/deploy#maintenance-jobs) section of its associated Ansible 'deploy' role documentation.
+<hr>
+
+These scripts are deployed via CI/CD jobs that utilise an Ansible playbook and are grouped by the service that they relate to. For more information refer to the [fil-tuxedo-stack deployment branch](https://github.com/companieshouse/fil-tuxedo-stack/tree/deployment), as well as the [Maintenance jobs](https://github.com/companieshouse/fil-tuxedo-stack/tree/deployment/roles/deploy#informix-maintenance-jobs) and [Informix maintenance jobs](https://github.com/companieshouse/fil-tuxedo-stack/tree/deployment/roles/management#informix-maintenance-jobs) sections of the project's Ansible 'deploy' and 'management roles respectively.
 
 ## Template scripts
 
@@ -14,7 +16,6 @@ The following sections detail in brief the function of each script:
 | Filename | Description |
 |--------|--------|
 | `cabs_check.j2` | Check CABS service is running and check logs for network errors. |
-
 
 </p>
 </details>
