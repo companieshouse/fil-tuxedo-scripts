@@ -1,6 +1,6 @@
 # fil-tuxedo-scripts
 
-Jinga2 template maintenance scripts for [fil-tuxedo-stack](https://github.com/companieshouse/fil-tuxedo-stack) services.
+Jinja2 template maintenance scripts for [fil-tuxedo-stack](https://github.com/companieshouse/fil-tuxedo-stack) services.
 
 <hr>
 
