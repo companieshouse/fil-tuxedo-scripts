@@ -105,7 +105,7 @@ check_logical_logs_archive_dir () {
 }
 
 check_current_logical_log_file () {
-    if [[ ! -f "${logical_log_file_path}" ]]; then
+    if [[ ! -f "${current_logical_log}" ]]; then
         info "Logical log file does not exist: '${current_logical_log}'"
         touch "${current_logical_log}" >/dev/null 2>&1
         exit_on_error "$?" "Unable to create empty logical log file at '${current_logical_log}'"
