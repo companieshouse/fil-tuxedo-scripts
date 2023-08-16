@@ -81,7 +81,7 @@ delete_mail_file () {
 
 send_alert () {
 {% if alerts.enabled %}
-    mailx -r "${USER}@$(hostname)" -s "WARNING - status 'v' in $(tr '[:lower:]' '[:upper:]' <<< "${USER}") auth_change table" {% for recipient in alerts_config.auth_change_status_check %}{{ recipient }} {% endfor %}< "${mail_file}"
+    mailx -s "${USER}@$(hostname) - WARNING - status 'v' in $(tr '[:lower:]' '[:upper:]' <<< "${USER}") auth_change table" {% for recipient in alerts_config.auth_change_status_check %}{{ recipient }} {% endfor %}< "${mail_file}"
 {% else %}
     echo "Alerts disabled; no mail message(s) will be generated"
 {% endif %}

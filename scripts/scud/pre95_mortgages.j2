@@ -84,7 +84,7 @@ delete_data_file () {
 
 send_alert () {
 {% if alerts.enabled %}
-    mailx -r "${USER}@$(hostname)" -s "WARNING - PRE95M file missing" {% for recipient in alerts_config.pre95_mortgages %}{{ recipient }} {% endfor %}< "${mail_file}"
+    mailx -s "${USER}@$(hostname) - WARNING - PRE95M file missing" {% for recipient in alerts_config.pre95_mortgages %}{{ recipient }} {% endfor %}< "${mail_file}"
 {% else %}
     echo "Alerts disabled; no mail message(s) will be generated"
 {% endif %}

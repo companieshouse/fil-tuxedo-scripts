@@ -203,7 +203,7 @@ exit_with_error () {
 send_alert () {
 {% if alerts.enabled %}
     local error_message="Logical log archive failed; check log file at '${log_file}'"
-    mailx -r "${USER}@$(hostname)" -s "WARNING - Logical log archive failure" {% for recipient in alerts_config.logical_log_archive %}{{ recipient }} {% endfor %}<<< "${error_message}"
+    mailx -s "${USER}@$(hostname) - WARNING - Logical log archive failure" {% for recipient in alerts_config.logical_log_archive %}{{ recipient }} {% endfor %}<<< "${error_message}"
 {% else %}
     echo "Alerts disabled; no mail message(s) will be generated"
 {% endif %}
