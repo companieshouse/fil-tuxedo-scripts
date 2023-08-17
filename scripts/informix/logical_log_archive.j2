@@ -138,16 +138,6 @@ archive_logical_log_file () {
     info "Finished archival of logical log file"
 }
 
-check_continuous_logical_log_backups () {
-    local ontape_pids=( $(pgrep -f 'ontape -c') )
-
-    if [[ "{{ '${#ontape_pids[@]}' }}" -gt 0 ]]; then
-        exit_with_error "Active continuous logical log backup processes (ontape -c) were found; cannot continue"
-    fi
-
-    info "No continuous logical log backup processes (ontape -c) were found"
-}
-
 start_continuous_logical_log_backup () {
     info "Starting continuous logical log backup for '${service}' database"
 
@@ -241,7 +231,6 @@ main () {
     trace "Informix logical log: '${current_logical_log}'"
     trace "Informix logical log archive: '${archived_logical_log}'"
 
-    check_continuous_logical_log_backups
     check_logical_logs_dir
     check_logical_logs_archive_dir
     check_current_logical_log_file
