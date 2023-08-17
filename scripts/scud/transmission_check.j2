@@ -56,7 +56,7 @@ send_alert () {
     local subject="$1"
     local mail_file="$2"
 {% if alerts.enabled %}
-    mailx -r "${USER}@$(hostname)" -s "${subject}" {% for recipient in alerts_config.transmission_check %}{{ recipient }} {% endfor %}< "${mail_file}"
+    mailx -s "${USER}@$(hostname) - ${subject}" {% for recipient in alerts_config.transmission_check %}{{ recipient }} {% endfor %}< "${mail_file}"
 {% else %}
     echo "Alerts disabled; no mail message(s) will be generated"
 {% endif %}

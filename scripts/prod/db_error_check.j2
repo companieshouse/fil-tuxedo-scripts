@@ -44,7 +44,7 @@ delete_mail_file () {
 
 send_alert () {
 {% if alerts.enabled %}
-    mailx -r "${USER}@$(hostname)" -s "Return code 1200 message in prod.log; potential DB update issue - INVESTIGATE - $(date)" {% for recipient in alerts_config.db_error_check %}{{ recipient }} {% endfor %}< "${mail_file}"
+    mailx -s "${USER}@$(hostname) - Return code 1200 message in prod.log; potential DB update issue - INVESTIGATE - $(date)" {% for recipient in alerts_config.db_error_check %}{{ recipient }} {% endfor %}< "${mail_file}"
 {% else %}
     echo "Alerts disabled; no mail message(s) will be generated"
 {% endif %}

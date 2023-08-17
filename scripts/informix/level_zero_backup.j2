@@ -177,7 +177,7 @@ exit_on_error () {
 send_alert () {
 {% if alerts.enabled %}
     local error_message="Level zero backup failed; check log file at '${log_file}'"
-    mailx -r "${USER}@$(hostname)" -s "WARNING - Level zero backup failure" {% for recipient in alerts_config.level_zero_backup %}{{ recipient }} {% endfor %}<<< "${error_message}"
+    mailx -s "${USER}@$(hostname) - WARNING - Level zero backup failure" {% for recipient in alerts_config.level_zero_backup %}{{ recipient }} {% endfor %}<<< "${error_message}"
 {% else %}
     echo "Alerts disabled; no mail message(s) will be generated"
 {% endif %}
