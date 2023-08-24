@@ -269,12 +269,12 @@ main () {
 
     load_logging_functions
 
+    # All data will be read from the prod services database
+    service="prod"
+
     log_file="{{ informix_logs_path }}/${service}/${script_name}.log"
 
     info "Starting OIS stats generation"
-
-    # All data will be read from the prod services database
-    service="prod"
 
     check_informix_config
     unset_informix_env_vars
