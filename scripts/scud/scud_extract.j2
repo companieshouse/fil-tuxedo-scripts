@@ -78,6 +78,7 @@ create_extract_file () {
     fi
 
     source "${config_dir}/envfile" && "${app_dir}/extract" >> "${log_file}"
+    exit_on_error "$?" "Exection of extract process failed: '${app_dir}/extract'"
 
     if [[ ! -f "${extract_file}" ]]; then
         exit_with_error "Extract file was not created at '${extract_file}'"
