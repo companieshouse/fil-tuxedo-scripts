@@ -190,9 +190,16 @@ archive_document_dirs () {
             exit_on_error "$?" "Unable to create archival directory for company at '${tiff_archive_dir}/${company_number}'"
         fi
 
-        log "Archiving directory '${document_id_dir}' to '${tiff_archive_dir}/${company_number}/${document_id}'"
-        mv "${document_id_dir}" "${tiff_archive_dir}/${company_number}/${document_id}" >/dev/null 2>&1
-        exit_on_error "$?" "Unable to archive directory '${document_id_dir}' to '${tiff_archive_dir}/${company_number}/${document_id}'"
+        local archival_parent_dir="${tiff_archive_dir}/${company_number}/$(date +%d-%m-%Y)"
+
+        log "Creating archival directory '${archival_parent_dir}'"
+        mkdir -p "${archival_parent_dir}"
+        exit_on_error "$?" "Unable to create archival directory '${archival_parent_dir}'"
+
+        log "Archiving directory '${document_id_dir}' to '${archival_parent_dir}/${document_id}'"
+        mv "${document_id_dir}" "${archival_parent_dir}/${document_id}" >/dev/null 2>&1
+        exit_on_error "$?" "Unable to archive directory '${document_id_dir}' to '${archival_parent_dir}/${document_id}'"
+
     done < <(find "${company_tiff_dir}" \
         -mindepth 1 \
         -maxdepth 1 \
