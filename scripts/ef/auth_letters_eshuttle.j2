@@ -416,7 +416,7 @@ initialise_logging () {
 
 send_alert () {
 {% if alerts.enabled %}
-    mailx -s "${USER}@$(hostname) - ACTION - ${company_number_count} eshuttle process failed" {% for recipient in alerts_config.auth_letters_eshuttle %}{{ recipient }} {% endfor %}< "${mail_file}"
+    mailx -s "${USER}@$(hostname) - ACTION - eshuttle process failed" {% for recipient in alerts_config.auth_letters_eshuttle %}{{ recipient }} {% endfor %}<<< "eShuttle process has failed. Please review log file: /var/log/tuxedo/ef/auth_letters_eshuttle.log."
 {% else %}
     echo "Alerts disabled; no mail message(s) will be generated"
 {% endif %}
