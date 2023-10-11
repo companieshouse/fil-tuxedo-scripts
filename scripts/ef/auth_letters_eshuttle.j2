@@ -57,8 +57,7 @@ check_user () {
 set_input_files () {
     input_files=( $(ls ${chips_auth_shuttle_output_dir}) )
     if [[ "{{ '${#input_files[@]}' }}" -eq 0 ]]; then
-        error "There are no input files to process, exiting"
-        exit 1
+        exit_with_error "There are no input files to process, exiting"
     fi
     trace "${FUNCNAME[0]}:${LINENO} input_files=(${input_files[*]})"
 }
@@ -69,31 +68,30 @@ check_shuttle_dirs () {
         "chips_auth_shuttle_output_dir"
     )
 
-    local errors="false"
-
     for shuttle_dir_var in "${shuttle_dir_vars[@]}"; do
         if [[ -z "${!shuttle_dir_var}" ]]; then
-            error "Script variable '${shuttle_dir_var}' is not set"
-            errors="true"
+            exit_with_error "Script variable '${shuttle_dir_var}' is not set"
         elif [[ ! -d "${!shuttle_dir_var}" ]]; then
-            error "Script variable '${shuttle_dir_var}' references the path '${!shuttle_dir_var}' which does not exist"
-            errors="true"
+            exit_with_error "Script variable '${shuttle_dir_var}' references the path '${!shuttle_dir_var}' which does not exist"
         fi
     done
-
-    if [[ "${errors}" == "true" ]]; then
-        exit 1
-    fi
 }
 
 exit_on_error () {
-    local exit_code="$1"
-    local message="$2"
+    local exit_code="${1}"
+    local message="${2}"
 
     if [[ "${exit_code}" -ne 0 ]]; then
         error "${message}"
-        exit 1
+        send_alert
+        exit "${exit_code}"
     fi
+}
+
+exit_with_error () {
+    local message="${1}"
+    local exit_code="255"
+    exit_on_error "${exit_code}" "${message}"
 }
 
 get_doc_auth_count () {
@@ -111,8 +109,7 @@ EOF
     local_doc_auth_count=$(sed -rn 's/\s*([0-9]+)\s*/\1/p' <<< "${local_doc_auth_count}")
 
     if [[ -z "${local_doc_auth_count}" ]]; then
-        error "Unable to determine doc auth count for company number '${company_number}'"
-        exit 1
+        exit_with_error "Unable to determine doc auth count for company number '${company_number}'"
     fi
 
     doc_auth_count="${local_doc_auth_count}"
@@ -125,8 +122,7 @@ get_new_auth_code () {
 
     while [[ "{{ '${#auth_code_digits}' }}" -lt "${auth_code_digit_count}" ]]; do
         if [[ "${iterations}" -gt "${auth_code_digit_count}" ]]; then
-            error "Unable to generate sufficient random digits for auth code"
-            exit 1
+            exit_with_error "Unable to generate sufficient random digits for auth code"
         fi
 
         auth_code_digits+="${RANDOM}"
@@ -153,8 +149,7 @@ EOF
     local_existing_auth_code=$(sed -rn 's/\s*([A-Za-z0-9]+)\s*/\1/p' <<< "${local_existing_auth_code}")
 
     if [[ -z "${local_existing_auth_code}" ]]; then
-        error "Unable to determine existing auth code"
-        exit 1
+        exit_with_error "Unable to determine existing auth code"
     fi
 
     auth_code="${local_existing_auth_code}"
@@ -294,8 +289,7 @@ disable_auth_codes () {
         local auth_code="$(cut -c1-6 <<< ${line})"
 
         if [[ -z "${auth_code}" ]]; then
-            error "Unable to determine auth code from unload file"
-            exit 1
+            exit_with_error "Unable to determine auth code from unload file"
         fi
 
         disable_auth_code "${company_number}" "${auth_code}" 
@@ -312,8 +306,7 @@ process_input_file () {
 
     > "${output_file_path}"
     if [[ "$?" -ne 0 ]]; then
-        error "Unable to create output file '${output_file_path}'"
-        exit 1
+        exit_with_error "Unable to create output file '${output_file_path}'"
     fi
 
     while read -r input_file_line; do
@@ -365,8 +358,7 @@ process_input_file () {
 
     cp -f "${output_file_path}" "${chips_auth_shuttle_input_dir}"
     if [[ "$?" -ne 0 ]]; then
-        error "Unable to copy output file to shuttle input directory"
-        exit 1
+        exit_with_error "Unable to copy output file to shuttle input directory"
     fi
 
     info "Finished input file processing for ${input_file_path}"
@@ -379,8 +371,7 @@ create_dir_if_not_exists () {
         info "Creating directory '${dir_path}'"
         mkdir -p "${dir_path}"
         if [[ "$?" -ne 0 ]]; then
-            error "Unable to create directory '${dir_path}'"
-            exit 1
+            exit_with_error "Unable to create directory '${dir_path}'"
         fi
     fi
 }
@@ -403,8 +394,7 @@ archive_input_file () {
 
     cp -f "${input_file_path}" "${archive_file_path}"
     if [[ "$?" -ne 0 ]]; then
-        error "Unable to copy input file to archive directory"
-        exit 1
+        exit_with_error "Unable to copy input file to archive directory"
     fi
 }
 
@@ -420,6 +410,16 @@ delete_input_file () {
 
 initialise_logging () {
     log_level=$(echo "${LOGLEVEL:-INFO}" | tr '[:upper:]' '[:lower:]')
+}
+
+# -- Alerts -------------------------------------------------------------------
+
+send_alert () {
+{% if alerts.enabled %}
+    mailx -s "${USER}@$(hostname) - ACTION - ${company_number_count} eshuttle process failed" {% for recipient in alerts_config.auth_letters_eshuttle %}{{ recipient }} {% endfor %}< "${mail_file}"
+{% else %}
+    echo "Alerts disabled; no mail message(s) will be generated"
+{% endif %}
 }
 
 # -- Entrypoint ---------------------------------------------------------------
