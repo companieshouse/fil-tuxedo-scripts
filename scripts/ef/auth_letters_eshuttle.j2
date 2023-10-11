@@ -177,7 +177,7 @@ doc_auth_li
 )
 VALUES (
 "${company_number}",
-"${auth_code}",
+'${auth_code}',
 TODAY,
 CURRENT,
 "ESH",
@@ -237,7 +237,7 @@ auth_letter_type,
 auth_letter_output)
 VALUES (
 "${company_number}",
-"${auth_code}",
+'${auth_code}',
 CURRENT,
 CURRENT,
 "Q",
@@ -270,7 +270,7 @@ dbaccess "${database}" - >/dev/null 2>&1 <<EOF
 update doc_auth
 set doc_auth_end_dt = "${today}"
 where doc_auth_co_no = "${company_number}"
-and doc_auth_code = "${auth_code}"
+and doc_auth_code = '${auth_code}'
 EOF
     exit_on_error "$?" "${FUNCNAME[0]}:${LINENO} dbaccess returned $?"
 }
