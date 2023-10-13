@@ -435,7 +435,7 @@ send_alert () {
     echo "Last ${alerts_log_line_count} lines of log file follow:" >> "${mail_file}"
     tail -n "${alerts_log_line_count}" "${log_file}" >> "${mail_file}"
     echo >> "${mail_file}"
-    mailx -s "${USER}@$(hostname) - ACTION - eshuttle process failed" mransome@companieshouse.gov.uk< "${mail_file}"
+    mailx -s "${USER}@$(hostname) - ACTION - eshuttle process failed" {% for recipient in alerts_config.auth_letters_eshuttle %}{{ recipient }} {% endfor %}< "${mail_file}"
     delete_mail_file
 {% else %}
     echo "Alerts disabled; no mail message(s) will be generated"
