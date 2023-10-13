@@ -431,7 +431,7 @@ initialise_logging () {
 send_alert () {
 {% if alerts.enabled %}
     create_mail_file
-    echo -e "eShuttle process has failed. Please review log file: /var/log/tuxedo/ef/auth_letters_eshuttle.log.\n" >> "${mail_file}"
+    echo -e "eShuttle process has failed. Please review log file: ${log_file}.\n" >> "${mail_file}"
     echo "Last ${alerts_log_line_count} lines of log file follow:" >> "${mail_file}"
     tail -n "${alerts_log_line_count}" "${log_file}" >> "${mail_file}"
     mailx -s "${USER}@$(hostname) - ACTION - eshuttle process failed" mransome@companieshouse.gov.uk< "${mail_file}"
