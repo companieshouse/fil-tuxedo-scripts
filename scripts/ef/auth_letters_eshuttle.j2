@@ -22,6 +22,8 @@ auth_code_digit_count="5"
 
 log_file="{{ tuxedo_logs_path }}/${USER}/${script_name}.log"
 
+alerts_log_line_count="5"
+
 # -- General ------------------------------------------------------------------
 
 log () {
@@ -75,6 +77,18 @@ check_shuttle_dirs () {
             exit_with_error "Script variable '${shuttle_dir_var}' references the path '${!shuttle_dir_var}' which does not exist"
         fi
     done
+}
+
+create_mail_file () {
+    mail_file=$(mktemp -t "${script_name}.XXXXXXX")
+    if [[ $? -ne 0 ]]; then
+        echo "Unable to create temporary mail file" >&2
+        exit 1
+    fi
+}
+
+delete_mail_file () {
+    rm -f "${mail_file}"
 }
 
 exit_on_error () {
@@ -416,7 +430,13 @@ initialise_logging () {
 
 send_alert () {
 {% if alerts.enabled %}
-    mailx -s "${USER}@$(hostname) - ACTION - eshuttle process failed" {% for recipient in alerts_config.auth_letters_eshuttle %}{{ recipient }} {% endfor %}<<< "eShuttle process has failed. Please review log file: /var/log/tuxedo/ef/auth_letters_eshuttle.log."
+    create_mail_file
+    echo -e "eShuttle process has failed. Please review log file: ${log_file}.\n" >> "${mail_file}"
+    echo "Last ${alerts_log_line_count} lines of log file follow:" >> "${mail_file}"
+    tail -n "${alerts_log_line_count}" "${log_file}" >> "${mail_file}"
+    echo >> "${mail_file}"
+    mailx -s "${USER}@$(hostname) - ACTION - eshuttle process failed" {% for recipient in alerts_config.auth_letters_eshuttle %}{{ recipient }} {% endfor %}< "${mail_file}"
+    delete_mail_file
 {% else %}
     echo "Alerts disabled; no mail message(s) will be generated"
 {% endif %}
