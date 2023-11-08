@@ -50,6 +50,7 @@ The following sections detail in brief the function of each script:
 
 | Filename | Description |
 |--------|--------|
+| `check_continuous_backups.j2` | Check for the presence of continuous logical log backup processes and generate email alerts if neccessary. |
 | `level_zero_backup.j2` | Perform a level zero database backup and archive the level zero backup file. |
 | `logging.j2` | Common logging functions for use in other scripts. |
 | `logical_log_archive.j2` | Perform logical log backup and restart continuous backups for the specified Informix database. |
