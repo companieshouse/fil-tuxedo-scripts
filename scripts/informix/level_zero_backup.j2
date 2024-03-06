@@ -10,7 +10,7 @@
 script_name=$(basename "$0")
 parent_dir="$(cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd)"
 
-informix_env_files_dir="{{ informix_install_path }}/etc"
+informix_env_files_dir="{{ informix_management_install_path }}/etc"
 informix_env_file_prefix="informix.env"
 
 informix_level_zero_backups_dir="/db_dump"
@@ -177,7 +177,7 @@ exit_on_error () {
 send_alert () {
 {% if alerts.enabled %}
     local error_message="Level zero backup failed; check log file at '${log_file}'"
-    mailx -s "${USER}@$(hostname) - WARNING - Level zero backup failure" {% for recipient in alerts_config.level_zero_backup %}{{ recipient }} {% endfor %}<<< "${error_message}"
+    mailx -s "${USER}@$(hostname) - WARNING - Level zero backup failure" {% for recipient in informix_management_alerts_config.level_zero_backup %}{{ recipient }} {% endfor %}<<< "${error_message}"
 {% else %}
     echo "Alerts disabled; no mail message(s) will be generated"
 {% endif %}
@@ -205,7 +205,7 @@ main () {
     source_informix_config
     check_informix_env_vars
 
-    log_file="{{ informix_logs_path }}/${service}/${script_name}.log"
+    log_file="{{ informix_management_logs_path }}/${service}/${script_name}.log"
 
     current_level_zero_backup="${informix_level_zero_backups_dir}/${service}level0.log"
     archived_level_zero_backup="${informix_level_zero_backups_archive_dir}/${service}level0.${yesterday}"
