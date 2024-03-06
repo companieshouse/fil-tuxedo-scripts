@@ -191,7 +191,7 @@ exit_with_error () {
 # -- Alerts -------------------------------------------------------------------
 
 send_alert () {
-{% if alerts.enabled %}
+{% if informix_management_alerts_enabled %}
     local error_message="Logical log archive failed; check log file at '${log_file}'"
     mailx -s "${USER}@$(hostname) - WARNING - Logical log archive failure" {% for recipient in informix_management_alerts_config.logical_log_archive %}{{ recipient }} {% endfor %}<<< "${error_message}"
 {% else %}

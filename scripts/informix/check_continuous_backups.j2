@@ -37,7 +37,7 @@ load_logging_functions () {
 # -- Alerts -------------------------------------------------------------------
 
 send_alert () {
-{% if alerts.enabled %}
+{% if informix_management_alerts_enabled %}
     local error_message="Only '${continuous_backup_process_count}' of '${expected_continuous_backup_process_count}' continuous logical log backup processes are running. Please investigate."
     mailx -s "${USER}@$(hostname) - WARNING - Continuous logical log backup processes" {% for recipient in informix_management_alerts_config.check_continuous_backups %}{{ recipient }} {% endfor %}<<< "${error_message}"
 {% else %}
