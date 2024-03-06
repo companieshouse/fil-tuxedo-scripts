@@ -12,7 +12,7 @@ database="prod"
 today=$(date "+%Y-%m-%d")
 yesterday=$(date --date="${today} -1 day" "+%Y-%m-%d")
 
-informix_env_files_dir="{{ informix_install_path }}/etc"
+informix_env_files_dir="{{ informix_management_install_path }}/etc"
 informix_env_file_prefix="informix.env"
 
 # -- General ------------------------------------------------------------------
@@ -253,7 +253,7 @@ send_stats () {
 {% if stats.enabled %}
     pushd /tmp >/dev/null
     cp -f "${source_file}" "${email_file}"
-    mailx -a "${email_file}" -s "${USER}@$(hostname) - ${subject}" {% for recipient in stats_config.ois_stats_production_recipients %}{{ recipient }} {% endfor %}<<< ""
+    mailx -a "${email_file}" -s "${USER}@$(hostname) - ${subject}" {% for recipient in informix_management_stats_config.ois_stats_production_recipients %}{{ recipient }} {% endfor %}<<< ""
     rm -f "${email_file}"
     popd >/dev/null
 {% else %}
@@ -272,7 +272,7 @@ main () {
     # All data will be read from the prod services database
     service="prod"
 
-    log_file="{{ informix_logs_path }}/${service}/${script_name}.log"
+    log_file="{{ informix_management_logs_path }}/${service}/${script_name}.log"
 
     info "Starting OIS stats generation"
 

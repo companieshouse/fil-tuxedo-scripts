@@ -17,7 +17,7 @@
 script_name=$(basename "$0")
 parent_dir="$(cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd)"
 
-informix_env_files_dir="{{ informix_install_path }}/etc"
+informix_env_files_dir="{{ informix_management_install_path }}/etc"
 informix_env_file_prefix="informix.env"
 
 informix_logical_logs_dir="/db_dump"
@@ -193,7 +193,7 @@ exit_with_error () {
 send_alert () {
 {% if alerts.enabled %}
     local error_message="Logical log archive failed; check log file at '${log_file}'"
-    mailx -s "${USER}@$(hostname) - WARNING - Logical log archive failure" {% for recipient in alerts_config.logical_log_archive %}{{ recipient }} {% endfor %}<<< "${error_message}"
+    mailx -s "${USER}@$(hostname) - WARNING - Logical log archive failure" {% for recipient in informix_management_alerts_config.logical_log_archive %}{{ recipient }} {% endfor %}<<< "${error_message}"
 {% else %}
     echo "Alerts disabled; no mail message(s) will be generated"
 {% endif %}
@@ -221,7 +221,7 @@ main () {
     source_informix_config
     check_informix_env_vars
 
-    log_file="{{ informix_logs_path }}/${service}/${script_name}.log"
+    log_file="{{ informix_management_logs_path }}/${service}/${script_name}.log"
 
     current_logical_log="${informix_logical_logs_dir}/${service}logical.log"
     archived_logical_log="${informix_logical_logs_archive_dir}/${service}logical.${yesterday}"

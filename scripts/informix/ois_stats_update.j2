@@ -10,7 +10,7 @@ parent_dir="$(cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd)"
 
 database="prod"
 
-informix_env_files_dir="{{ informix_install_path }}/etc"
+informix_env_files_dir="{{ informix_management_install_path }}/etc"
 informix_env_file_prefix="informix.env"
 
 # stats_dir should be the path to a directory on a shared NFS mount; OIS Tuxedo
@@ -140,7 +140,7 @@ exit_on_error () {
 main () {
     load_logging_functions
 
-    log_file="{{ informix_logs_path }}/common/${script_name}.log"
+    log_file="{{ informix_management_logs_path }}/common/${script_name}.log"
 
     info "Starting OIS stats update"
 
