@@ -250,7 +250,7 @@ send_stats () {
     local email_file="${2}"
     local subject="${3}"
 
-{% if stats.enabled %}
+{% if informix_management_stats_enabled %}
     pushd /tmp >/dev/null
     cp -f "${source_file}" "${email_file}"
     mailx -a "${email_file}" -s "${USER}@$(hostname) - ${subject}" {% for recipient in informix_management_stats_config.ois_stats_production_recipients %}{{ recipient }} {% endfor %}<<< ""
