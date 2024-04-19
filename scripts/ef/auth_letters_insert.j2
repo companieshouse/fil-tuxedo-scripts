@@ -83,7 +83,15 @@ CURRENT,
 "R"
 )
 EOF
-        exit_on_error "$?" "dbaccess returned $? (${FUNCNAME[0]}:${LINENO})"
+        local exit_status="$?"
+        if (( exit_status == 0 )); then
+            log "Succesfully inserted auth_letter record for company number '${auth_letter_co_no}'"
+        else
+            local error_message="Error: failed to insert auth_letter record for company number '${auth_letter_co_no}' (dbaccess returned ${exit_status} ${FUNCNAME[0]}:${LINENO})"
+            log "${error_message}"
+            append_mail_file "${error_message}"
+            db_insert_failure="true"
+        fi
     done < "${unload_file}"
 
     log "Finished auth letter insert operations"
@@ -94,14 +102,49 @@ delete_unload_file () {
     exit_on_error "$?" "Unable to remove temporary file (${FUNCNAME[0]}:${LINENO})"
 }
 
+create_mail_file () {
+    mail_file=$(mktemp -t "${script_name}.XXXXXXX")
+    if [[ $? -ne 0 ]]; then
+        echo "Unable to create temporary mail file" >&2
+        exit 1
+    fi
+}
+
+append_mail_file () {
+    local message="$1"
+    echo -e "${message}" >> "${mail_file}"
+}
+
+delete_mail_file () {
+    rm -f "${mail_file}"
+}
+
+# -- Alerts -------------------------------------------------------------------
+
+send_alert () {
+{% if alerts.enabled %}
+    append_mail_file ""
+    mailx -s "${USER}@$(hostname) - WARNING - $(tr '[:lower:]' '[:upper:]' <<< "${USER}") auth_letters_insert problem" {% for recipient in alerts_config.auth_letters_insert %}{{ recipient }} {% endfor %}< "${mail_file}"
+{% else %}
+    echo "Alerts disabled; no mail message(s) will be generated"
+{% endif %}
+}
+
 # -- Entrypoint ---------------------------------------------------------------
 
 main () {
     check_user
+    create_mail_file
     create_unload_file
     unload_auth_change_rows
     insert_auth_letter_entries
+
+    if [[ "${db_insert_failure}" == "true" ]]; then
+        send_alert
+    fi
+
     delete_unload_file
+    delete_mail_file
 }
 
 main "${@}"
