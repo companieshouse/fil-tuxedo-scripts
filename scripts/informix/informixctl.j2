@@ -19,7 +19,7 @@ check_action () {
     local action="${1}"
 
     if [[ ! "${action}" =~ ^(stop|start)$ ]]; then
-        echo "Unknown action '${action}'; valid options are: stop, start" >&2
+        echo "Unknown action '${action}'; valid options are: stop start" >&2
         exit 1
     fi
 }
@@ -101,12 +101,24 @@ exit_with_error () {
     exit_on_error "${exit_code}" "${message}"
 }
 
-start_informix_server() {
-    oninit -v
+start_informix_server () {
+    info "Starting Informix DB server '${service}'"
+    if oninit -v; then
+        info "Started Informix DB server '${service}'"
+    else
+        error "Unable to start Informix DB server '${service}'"
+        exit 1
+    fi
 }
 
-stop_informix_server() {
-    onclean -ky
+stop_informix_server () {
+    info "Stopping Informix DB server '${service}'"
+    if onclean -ky; then
+        info "Stopped Informix DB server '${service}'"
+    else
+        error "Unable to stop Informix DB server '${service}'"
+        exit 1
+    fi
 }
 
 # -- Entrypoint ---------------------------------------------------------------
