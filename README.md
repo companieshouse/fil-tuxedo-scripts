@@ -4,7 +4,7 @@ Jinja2 template maintenance scripts for [fil-tuxedo-stack](https://github.com/co
 
 <hr>
 
-These scripts are deployed via CI/CD jobs that utilise an Ansible playbook. For more information refer to the [fil-tuxedo-stack deployment branch](https://github.com/companieshouse/fil-tuxedo-stack/tree/deployment) and [Informix Management role](https://github.com/companieshouse/ansi    ble-collection-middleware/tree/main/roles/informix_management).
+These scripts are deployed via CI/CD jobs that utilise an Ansible playbook. For more information refer to the [fil-tuxedo-stack deployment branch](https://github.com/companieshouse/fil-tuxedo-stack/tree/deployment) and [Informix Management role](https://github.com/companieshouse/ansible-collection-middleware/tree/main/roles/informix_management).
 
 ## Template scripts
 
