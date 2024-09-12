@@ -93,7 +93,7 @@ The following sections detail in brief the function of each script:
 
 ## Branching Strategy
 
-This project uses a trunk-based branching strategy and changes merged to the `main` branch are incorporated into versioned artefacts via the [fil-tuxedo-scripts](https://github.com/companieshouse/ci-pipelines/blob/mast    er/pipelines/ssplatform/team-infrastructure/fil-tuxedo-scripts) pipeline:
+This project uses a trunk-based branching strategy and changes merged to the `main` branch are incorporated into versioned artefacts via the [fil-tuxedo-scripts](https://github.com/companieshouse/ci-pipelines/blob/master/pipelines/ssplatform/team-infrastructure/fil-tuxedo-scripts) pipeline:
 
 ```mermaid
 %%{init: { 'logLevel': 'debug', 'theme': 'default' , 'themeVariables': {
