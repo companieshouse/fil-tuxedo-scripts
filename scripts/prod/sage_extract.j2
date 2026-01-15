@@ -8,6 +8,7 @@ source {{ informix_install_path }}/etc/informix.env.${USER}
 
 script_name=$(basename "$0")
 
+e5_shared_mount="/mnt/nfs/e5_upload"
 telesales_filename="telesales_int.txt"
 database="prod"
 
@@ -63,19 +64,10 @@ delete_unload_file () {
 
 # -- Stats --------------------------------------------------------------------
 
-send_stats () {
-{% if stats.enabled %}
-{% for remote in stats_config.ftp_hosts %}
-    ftp -v {{ remote.host }} <<EOF > {{ tuxedo_logs_path }}/${USER}/sage_extract.ftp.log 2>&1
-cd {{ remote.directory }}
-put ${extracts_file} ${telesales_filename}
-put ${extracts_file} backup_${telesales_filename}
-bye
-EOF
-{% endfor %}
-{% else %}
-    echo "Stats disabled; no file(s) will be sent"
-{% endif %}
+copy_extracts_file () {
+    if [[ -d "${e5_shared_mount}" ]]; then
+        cp "${extracts_file}" "${e5_shared_mount}/${telesales_filename}"
+    fi
 }
 
 # -- Entrypoint ---------------------------------------------------------------
@@ -85,7 +77,7 @@ main () {
     create_unload_file
     unload_db_rows
     create_extracts_file
-    send_stats
+    copy_extracts_file
     delete_unload_file
 }
 
