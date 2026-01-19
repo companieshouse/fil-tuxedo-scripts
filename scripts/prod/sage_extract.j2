@@ -9,6 +9,7 @@ source {{ informix_install_path }}/etc/informix.env.${USER}
 script_name=$(basename "$0")
 
 e5_shared_mount="/mnt/nfs/e5_upload"
+e5_group="e5fsadmin"
 telesales_filename="telesales_int.txt"
 database="prod"
 
@@ -67,6 +68,7 @@ delete_unload_file () {
 copy_extracts_file () {
     if [[ -d "${e5_shared_mount}" ]]; then
         cp "${extracts_file}" "${e5_shared_mount}/${telesales_filename}"
+        chown ":${e5_group}" "${e5_shared_mount}/${telesales_filename}"
     fi
 }
 
