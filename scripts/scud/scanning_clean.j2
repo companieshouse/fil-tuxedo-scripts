@@ -1,44 +1,49 @@
 #!/bin/bash
+###################################################################################
+### Delete image files older than the specified number of days and delete empty ###
+### scanning directories whose names being with a defined company prefix. ###
 
-# Delete image files older than the specified number of days and delete empty
-# scanning directories whose names being with a defined company prefix.
+########################
+### general settings ###
+#PS4=':${LINENO}+'
+#set -x
 
-# -- Internal variables -------------------------------------------------------
+#########################
+### general variables ###
+SCAN_DIR="/scanning"
+FILE_MAXAGE_DAYS=14
+DIR_PREFIXES=("0" "S" "N" "BR" "OC" "FC" "LP")
 
-scan_dir="/scanning"
-
-file_max_age_days=7
-
-dir_prefixes=(
-    "0"
-    "S"
-    "N"
-    "BR"
-    "OC"
-    "FC"
-    "LP"
-)
-
-# -- General ------------------------------------------------------------------
-
-delete_scanning_files () {
-    echo "Deleting scanning files:"
-    find "$(realpath ${scan_dir})" -type f \( -name '*.TIF' -o -name '*.BSJ' \) -mtime +"${file_max_age_days}" -delete -print
-    find "$(realpath ${scan_dir})" -type l -mtime +"${file_max_age_days}" -delete -print
+#############################
+### delete_scanning_files ###
+function delete_scanning_files {
+  echo "Deleting scanning files:"
+  find "$(realpath ${SCAN_DIR})" -type f \( -name '*.TIF' -o -name '*.BSJ' \) -mtime +"${FILE_MAXAGE_DAYS}" -delete -print
+  find "$(realpath ${SCAN_DIR})" -type l -mtime +"${FILE_MAXAGE_DAYS}" -delete -print
 }
 
-delete_scanning_directories () {
-    echo "Deleting scanning directories:"
-    for prefix in "${dir_prefixes[@]}"; do
-        find "$(realpath ${scan_dir})" -maxdepth 1 -type d -name "${prefix}"* -empty -delete -print
+###################################
+### delete_scanning_directories ###
+function delete_scanning_directories {
+  echo "Deleting scanning directories:"
+  #cat /dev/null > "${LIST_2CLEAN}"
+  cd "$(realpath ${SCAN_DIR})"
+  for PREFIX in "${DIR_PREFIXES[@]}"
+  do
+    mapfile -t LIST_2CLEAN < <( find "$(realpath ${SCAN_DIR})" -maxdepth 1 -type d \( -path "*/tiffexport" -prune \) -o \( -name "${PREFIX}*" -mtime +"$FILE_MAXAGE_DAYS" -print \) )
+    for TO_REMOVE in "${LIST_2CLEAN[@]}"
+    do
+      find "${TO_REMOVE}" -type d -mtime +"$FILE_MAXAGE_DAYS" -delete -print
     done
+  done
 }
 
-# -- Entrypoint ---------------------------------------------------------------
-
-main () {
-    delete_scanning_files
-    delete_scanning_directories
+##############################
+### main-invoking-function ###
+### so that run in order   ###
+function main-invoking-functions {
+  delete_scanning_files
+  delete_scanning_directories
 }
 
-main "${@}"
+main-invoking-functions
