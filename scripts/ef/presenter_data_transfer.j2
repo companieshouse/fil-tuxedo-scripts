@@ -68,6 +68,27 @@ EOF
     exit_on_error "$?" "dbaccess returned $? (${FUNCNAME[0]}:${LINENO})"
 }
 
+validate_no_accounts_today () {
+    local data_file=$(mktemp -t validation_file.XXXXXXX)
+    dbaccess "${database}" - >/dev/null 2>&1 <<EOF
+set isolation dirty read;
+UNLOAD TO "${data_file}" DELIMITER ""
+SELECT COUNT(*) FROM PRESENTER
+WHERE PRES_START_DT = TODAY;
+EOF
+
+    exit_on_error "$?" "dbaccess returned $? (${FUNCNAME[0]}:${LINENO})"
+
+    local presenter_count=$(< "${data_file}")
+    rm "${data_file}"
+
+    if [[ "${presenter_count}" == "0.0" ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
 generate_test_data_file () {
     data_file=$(mktemp -t presenter_data_test.XXXXXXX)
     exit_on_error "$?" "Unable to create temporary file (${FUNCNAME[0]}:${LINENO})"
@@ -94,8 +115,14 @@ transfer_data_file () {
 generate_data_file () {
     if [[ "${transfer_mode}" == "test" ]]; then
         data_date="${today}"
-        generate_test_data_file
-        transfer_data_file
+
+        if validate_no_accounts_today; then
+            echo "No accounts created today!"
+            exit 0
+        else
+            generate_test_data_file
+            transfer_data_file
+        fi
     elif [[ "${transfer_mode}" == "live" ]]; then
         data_date="${yesterday}"
         generate_live_data_file
